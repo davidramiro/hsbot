@@ -1,0 +1,21 @@
+[bot]
+# log level, debug/info
+log_level = "info"
+
+[chat]
+# Timeout to clear conversation cache per ChatID
+context_timeout = "5m"
+
+[telegram]
+bot_token = "4242:telegram-bot-token"
+
+[claude]
+api_key = "sk-api-key"
+system_prompt = '''
+You are HSBot, a helpful assistant.
+'''
+
+[fal]
+api_key = "4242:1234"
+flux_url = "https://fal.run/fal-ai/flux-pro"
+whisper_url = "https://fal.run/fal-ai/whisper"
