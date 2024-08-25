@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"hsbot/internal/adapters/file"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/rs/zerolog/log"
 )
 
 const MaxPower = 100
@@ -53,12 +52,9 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 	}
 
 	size := MaxPower - (power / PowerFactor)
-	dimensions := fmt.Sprintf("%f%%x%f%%", size, size)
-	outFilename := fmt.Sprintf("%s%s", path, ".png")
+	dimensions := fmt.Sprintf("%d%%x%d%%", int(size), int(size))
 
-	args := make([]string, 0, len(m.magickBinary))
-	copy(args, m.magickBinary)
-	args = append(args, path, "-liquid-rescale", dimensions, outFilename)
+	args := append(m.magickBinary, path, "-liquid-rescale", dimensions, path)
 
 	cmd := exec.Command(args[0], args[1:]...)
 	out, err := cmd.Output()
@@ -69,5 +65,5 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 
 	log.Debug().Msg("magick commands finished")
 
-	return file.GetTemp(outFilename)
+	return file.GetTemp(path)
 }
