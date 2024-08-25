@@ -42,7 +42,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	go getOptionalImage(ctx, b, update, imageURL)
 	go getOptionalAudio(ctx, b, update, audioURL)
 
-	commandHandler.Respond(ctx, &domain.Message{
+	go commandHandler.Respond(ctx, &domain.Message{
 		ID:               update.Message.ID,
 		ChatID:           update.Message.Chat.ID,
 		Text:             update.Message.Text,

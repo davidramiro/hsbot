@@ -78,6 +78,7 @@ const ChatActionRepeatSeconds = 5
 
 func (s *TelegramSender) SendChatAction(ctx context.Context, chatID int64, action domain.Action) {
 	log.Debug().Int64("chatID", chatID).Msg("starting action routine")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,7 +97,8 @@ func (s *TelegramSender) SendChatAction(ctx context.Context, chatID int64, actio
 			chatAction = models.ChatActionTyping
 		}
 
-		log.Debug().Int64("chatID", chatID).Msg("transmitting action")
+		log.Debug().Int64("chatID", chatID).Str("chatAction", string(chatAction)).
+			Msg("transmitting action")
 		_, err := s.bot.SendChatAction(ctx, &bot.SendChatActionParams{
 			ChatID: chatID,
 			Action: chatAction,

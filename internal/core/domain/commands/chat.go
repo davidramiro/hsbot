@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,7 @@ type ChatHandler struct {
 	textSender    port.TextSender
 	command       string
 	cache         map[int64]*Conversation
+	mutex         sync.Mutex
 }
 
 type Conversation struct {
@@ -63,6 +65,7 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) erro
 		return nil
 	}
 
+	h.mutex.Lock()
 	conversation, ok := h.cache[message.ChatID]
 	if !ok {
 		l.Debug().Msg("new conversation")
@@ -102,6 +105,8 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) erro
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
 	conversation.timestamp = time.Now()
 
+	h.mutex.Unlock()
+
 	err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
 		message.ID,
@@ -120,6 +125,7 @@ func (h *ChatHandler) clearCache(timeout, tick time.Duration) {
 	log.Debug().Msg("gpt cache timer started")
 
 	for range time.Tick(tick) {
+		log.Debug().Msg("tick, checking if cache should expire")
 		for chatID := range h.cache {
 			log.Debug().Int64("chatID", chatID).Msg("checking timestamp for id")
 			messageTime := h.cache[chatID].timestamp
