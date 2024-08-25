@@ -23,14 +23,14 @@ type Conversation struct {
 }
 
 func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, command string,
-	cacheDuration time.Duration) *ChatHandler {
+	cacheDuration, tickRate time.Duration) *ChatHandler {
 	h := &ChatHandler{
 		textGenerator: textGenerator,
 		textSender:    textSender,
 		command:       command,
 	}
 
-	go h.clearCache(cacheDuration)
+	go h.clearCache(cacheDuration, tickRate)
 
 	return h
 }
@@ -39,7 +39,7 @@ func (h *ChatHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) {
+func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -57,10 +57,10 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) {
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
 	conversation, ok := h.cache[message.ChatID]
@@ -93,13 +93,13 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) {
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
-	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: promptText})
+	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
 	conversation.timestamp = time.Now()
 
 	err = h.textSender.SendMessageReply(ctx,
@@ -109,16 +109,17 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) {
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		cancel()
-		return
+		return err
 	}
 
 	cancel()
+	return nil
 }
 
-func (h *ChatHandler) clearCache(timeout time.Duration) {
+func (h *ChatHandler) clearCache(timeout, tick time.Duration) {
 	log.Debug().Msg("gpt cache timer started")
 
-	for range time.Tick(time.Minute) {
+	for range time.Tick(tick) {
 		for chatID := range h.cache {
 			log.Debug().Int64("chatID", chatID).Msg("checking timestamp for id")
 			messageTime := h.cache[chatID].timestamp
