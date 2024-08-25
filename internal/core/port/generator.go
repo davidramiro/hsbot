@@ -10,7 +10,7 @@ type TextGenerator interface {
 }
 
 type Transcriber interface {
-	GenerateFromAudio(ctx context.Context, url string) (string, error)
+	GenerateFromAudio(ctx context.Context, text string) (string, error)
 }
 
 type ImageGenerator interface {

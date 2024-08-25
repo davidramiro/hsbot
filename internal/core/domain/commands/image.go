@@ -30,7 +30,7 @@ func (h *ImageHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *ImageHandler) Respond(ctx context.Context, message *domain.Message) {
+func (h *ImageHandler) Respond(ctx context.Context, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -49,10 +49,10 @@ func (h *ImageHandler) Respond(ctx context.Context, message *domain.Message) {
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
 	imageURL, err := h.imageGenerator.GenerateFromPrompt(ctx, prompt)
@@ -62,21 +62,23 @@ func (h *ImageHandler) Respond(ctx context.Context, message *domain.Message) {
 		err := h.textSender.SendMessageReply(ctx,
 			message.ChatID,
 			message.ID,
-			fmt.Sprintf("error getting FAL response: %s", err))
+			fmt.Sprintf("%s: %s", errMsg, err))
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
 	err = h.imageSender.SendImageURLReply(ctx, message.ChatID, message.ID, imageURL)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		cancel()
-		return
+		return err
 	}
+
 	cancel()
+	return nil
 }

@@ -27,7 +27,7 @@ func (h *ScaleHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *ScaleHandler) Respond(ctx context.Context, message *domain.Message) {
+func (h *ScaleHandler) Respond(ctx context.Context, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -45,10 +45,10 @@ func (h *ScaleHandler) Respond(ctx context.Context, message *domain.Message) {
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
 	args := domain.ParseCommandArgs(message.Text)
@@ -65,10 +65,10 @@ func (h *ScaleHandler) Respond(ctx context.Context, message *domain.Message) {
 			if err != nil {
 				l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 				cancel()
-				return
+				return err
 			}
 			cancel()
-			return
+			return nil
 		}
 	}
 
@@ -79,17 +79,19 @@ func (h *ScaleHandler) Respond(ctx context.Context, message *domain.Message) {
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
 	err = h.imageSender.SendImageFileReply(ctx, message.ChatID, *message.ReplyToMessageID, rescaled)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		cancel()
-		return
+		return err
 	}
+
 	cancel()
+	return nil
 }

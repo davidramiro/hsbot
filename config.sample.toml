@@ -5,6 +5,8 @@ log_level = "info"
 [chat]
 # Timeout to clear conversation cache per ChatID
 context_timeout = "5m"
+# Tickrate to check conversation cache with
+context_tickrate = "1m"
 
 [telegram]
 bot_token = "4242:telegram-bot-token"

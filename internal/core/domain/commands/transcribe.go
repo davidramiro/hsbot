@@ -23,7 +23,7 @@ func (h *TranscribeHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message) {
+func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -37,14 +37,15 @@ func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
 	if message.AudioURL == "" {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "no audio found for transcription")
+		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "reply to an audio")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
+
 		cancel()
-		return
+		return nil
 	}
 
 	resp, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
@@ -53,17 +54,26 @@ func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			cancel()
-			return
+			return err
 		}
 		cancel()
-		return
+		return nil
 	}
 
-	err = h.textSender.SendMessageReply(ctx, message.ChatID, *message.ReplyToMessageID, resp)
+	var replyToID int
+	if message.ReplyToMessageID != nil {
+		replyToID = *message.ReplyToMessageID
+	} else {
+		replyToID = message.ID
+	}
+
+	err = h.textSender.SendMessageReply(ctx, message.ChatID, replyToID, resp)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		cancel()
-		return
+		return err
 	}
+
 	cancel()
+	return nil
 }

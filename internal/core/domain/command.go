@@ -9,7 +9,7 @@ import (
 )
 
 type CommandResponder interface {
-	Respond(ctx context.Context, message *Message)
+	Respond(ctx context.Context, message *Message) error
 	GetCommand() string
 }
 
@@ -36,12 +36,13 @@ func (c *CommandRegistry) Get(command string) (CommandResponder, error) {
 
 	handler, ok := c.commands[command]
 	if !ok {
-		return nil, errors.New("commands not found")
+		return nil, errors.New("command not found")
 	}
 
 	return handler, nil
 }
-func (c *CommandRegistry) ListServices() []string {
+
+func (c *CommandRegistry) ListCommands() []string {
 	keys := make([]string, len(c.commands))
 
 	i := 0

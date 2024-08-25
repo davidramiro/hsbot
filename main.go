@@ -64,14 +64,19 @@ func main() {
 	}
 	transcriber := generator.NewFALGenerator(viper.GetString("fal.whisper_url"), viper.GetString("fal.api_key"))
 
-	chatConvoDuration, err := time.ParseDuration(viper.GetString("chat.context_timeout"))
+	convoTimeout, err := time.ParseDuration(viper.GetString("chat.context_timeout"))
 	if err != nil {
-		log.Panic().Err(err).Msg("invalid duration for chat context in config")
+		log.Panic().Err(err).Msg("invalid timeout for chat context in config")
+	}
+
+	convoTickrate, err := time.ParseDuration(viper.GetString("chat.context_tickrate"))
+	if err != nil {
+		log.Panic().Err(err).Msg("invalid tickrate for chat context in config")
 	}
 
 	commandRegistry := &domain.CommandRegistry{}
 	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, "/chat",
-		chatConvoDuration))
+		convoTimeout, convoTickrate))
 	commandRegistry.Register(commands.NewImageHandler(fluxGenerator, s, s, "/image"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
 	commandRegistry.Register(commands.NewTranscribeHandler(transcriber, s, "/transcribe"))
