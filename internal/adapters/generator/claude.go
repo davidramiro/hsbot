@@ -53,7 +53,7 @@ func (c *ClaudeGenerator) GenerateFromPrompt(ctx context.Context, prompts []doma
 
 func createUserMessage(ctx context.Context, prompt domain.Prompt) (anthropic.Message, error) {
 	if prompt.ImageURL != "" {
-		f, err := file.Download(ctx, prompt.ImageURL)
+		f, err := file.DownloadFile(ctx, prompt.ImageURL)
 		if err != nil {
 			return anthropic.Message{}, fmt.Errorf("error downloading image: %w", err)
 		}

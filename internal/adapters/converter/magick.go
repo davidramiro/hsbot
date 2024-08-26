@@ -8,6 +8,7 @@ import (
 	"hsbot/internal/adapters/file"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const MaxPower = 100
@@ -41,20 +42,31 @@ func NewMagickConverter() (*MagickConverter, error) {
 }
 
 func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power float32) ([]byte, error) {
-	f, err := file.Download(ctx, imageURL)
+	f, err := file.DownloadFile(ctx, imageURL)
 	if err != nil {
 		return nil, err
 	}
 
-	path, err := file.SaveTemp(f, filepath.Ext(imageURL))
+	extension := filepath.Ext(imageURL)
+	path, err := file.SaveTempFile(f, extension)
 	if err != nil {
 		return nil, err
 	}
 
 	size := MaxPower - (power / PowerFactor)
+	outFile := fmt.Sprintf("%sliq%s", strings.TrimSuffix(path, extension), extension)
 	dimensions := fmt.Sprintf("%d%%x%d%%", int(size), int(size))
 
-	args := append(m.magickBinary, path, "-liquid-rescale", dimensions, path)
+	defer file.RemoveTempFile(path)
+	defer file.RemoveTempFile(outFile)
+
+	args := append(m.magickBinary, path, "-liquid-rescale", dimensions, outFile)
+
+	log.Debug().Strs("args", args).
+		Str("dimensions", dimensions).
+		Str("outFile", outFile).
+		Str("path", path).
+		Msg("scaling image")
 
 	cmd := exec.Command(args[0], args[1:]...)
 	out, err := cmd.Output()
@@ -65,5 +77,5 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 
 	log.Debug().Msg("magick commands finished")
 
-	return file.GetTemp(path)
+	return file.GetTempFile(outFile)
 }

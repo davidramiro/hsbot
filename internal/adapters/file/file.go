@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Download(ctx context.Context, path string) ([]byte, error) {
+func DownloadFile(ctx context.Context, path string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		log.Error().Err(err).Str("path", path).Msg("")
@@ -38,7 +38,7 @@ func Download(ctx context.Context, path string) ([]byte, error) {
 	return buf, nil
 }
 
-func SaveTemp(data []byte, extension string) (string, error) {
+func SaveTempFile(data []byte, extension string) (string, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
@@ -51,13 +51,14 @@ func SaveTemp(data []byte, extension string) (string, error) {
 	f, err := os.Create(path)
 	if err != nil {
 		log.Error().Err(err).Msg("could not create temp file")
-		return "", err
+		return "", fmt.Errorf("error creating temp file %w", err)
 	}
 
 	defer f.Close()
 
 	if _, err := f.Write(data); err != nil {
-		return "", err
+		log.Error().Err(err).Msg("could not write temp file")
+		return "", fmt.Errorf("error writing temp file %w", err)
 	}
 
 	log.Debug().Str("path", f.Name()).Msg("created file")
@@ -65,19 +66,17 @@ func SaveTemp(data []byte, extension string) (string, error) {
 	return f.Name(), nil
 }
 
-func GetTemp(path string) ([]byte, error) {
+func GetTempFile(path string) ([]byte, error) {
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		log.Error().Err(err).Msg("")
-		return nil, err
+		return nil, fmt.Errorf("error retrieving temp file %w", err)
 	}
-
-	defer removeTempFile(path)
 
 	return buf, nil
 }
 
-func removeTempFile(path string) {
+func RemoveTempFile(path string) {
 	err := os.Remove(path)
 	if err != nil {
 		log.Warn().Str("path", path).Err(err).Msg("could not clean up temp file")
