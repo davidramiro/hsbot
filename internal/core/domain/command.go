@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 type CommandResponder interface {
-	Respond(ctx context.Context, message *Message) error
+	Respond(ctx context.Context, timeout time.Duration, message *Message) error
 	GetCommand() string
 }
 

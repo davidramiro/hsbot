@@ -8,6 +8,10 @@ context_timeout = "5m"
 # Tickrate to check conversation cache with
 context_tickrate = "1m"
 
+[handler]
+# timeout for actions initiated by the command handler
+timeout = "30s"
+
 [telegram]
 bot_token = "4242:telegram-bot-token"
 

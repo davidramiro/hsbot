@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"hsbot/internal/core/domain"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -11,10 +12,11 @@ import (
 
 type CommandHandler struct {
 	commandRegistry *domain.CommandRegistry
+	timeout         time.Duration
 }
 
-func NewCommandHandler(commandRegistry *domain.CommandRegistry) *CommandHandler {
-	return &CommandHandler{commandRegistry: commandRegistry}
+func NewCommandHandler(commandRegistry *domain.CommandRegistry, timeout time.Duration) *CommandHandler {
+	return &CommandHandler{commandRegistry: commandRegistry, timeout: timeout}
 }
 
 func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -42,7 +44,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	go getOptionalImage(ctx, b, update, imageURL)
 	go getOptionalAudio(ctx, b, update, audioURL)
 
-	go commandHandler.Respond(ctx, &domain.Message{
+	go commandHandler.Respond(ctx, h.timeout, &domain.Message{
 		ID:               update.Message.ID,
 		ChatID:           update.Message.Chat.ID,
 		Text:             update.Message.Text,

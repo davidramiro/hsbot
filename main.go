@@ -81,7 +81,12 @@ func main() {
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
 	commandRegistry.Register(commands.NewTranscribeHandler(transcriber, s, "/transcribe"))
 
-	commandHandler := handler.NewCommandHandler(commandRegistry)
+	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
+	if err != nil {
+		log.Panic().Err(err).Msg("invalid timeout for handler in config")
+	}
+
+	commandHandler := handler.NewCommandHandler(commandRegistry, handlerTimeout)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
 

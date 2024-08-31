@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -23,7 +24,7 @@ func (h *TranscribeHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message) error {
+func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -33,18 +34,18 @@ func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message
 
 	l.Info().Msg("handling request")
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
 	if message.AudioURL == "" {
 		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "reply to an audio")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			cancel()
 			return err
 		}
 
-		cancel()
 		return nil
 	}
 
@@ -53,10 +54,10 @@ func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message
 		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, fmt.Sprintf("transcription failed: %s", err))
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			cancel()
+
 			return err
 		}
-		cancel()
+
 		return nil
 	}
 
@@ -70,10 +71,9 @@ func (h *TranscribeHandler) Respond(ctx context.Context, message *domain.Message
 	err = h.textSender.SendMessageReply(ctx, message.ChatID, replyToID, resp)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-		cancel()
+
 		return err
 	}
 
-	cancel()
 	return nil
 }

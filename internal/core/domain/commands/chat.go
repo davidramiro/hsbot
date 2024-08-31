@@ -41,7 +41,7 @@ func (h *ChatHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) error {
+func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -50,7 +50,9 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) erro
 
 	l.Info().Msg("handling request")
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
 	promptText := domain.ParseCommandArgs(message.Text)
@@ -58,10 +60,8 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) erro
 		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			cancel()
 			return err
 		}
-		cancel()
 		return nil
 	}
 
@@ -95,10 +95,9 @@ func (h *ChatHandler) Respond(ctx context.Context, message *domain.Message) erro
 			fmt.Sprintf("failed to generate reply: %s", err))
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			cancel()
 			return err
 		}
-		cancel()
+
 		return nil
 	}
 
