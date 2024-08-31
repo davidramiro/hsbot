@@ -3,9 +3,12 @@ package commands
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"hsbot/internal/core/domain"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type MockImageGenerator struct {
@@ -14,7 +17,7 @@ type MockImageGenerator struct {
 	Message  string
 }
 
-func (m *MockImageGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (string, error) {
+func (m *MockImageGenerator) GenerateFromPrompt(_ context.Context, prompt string) (string, error) {
 	m.Message = prompt
 	return m.response, m.err
 }
@@ -24,12 +27,12 @@ type MockImageSender struct {
 	Message string
 }
 
-func (m *MockImageSender) SendImageURLReply(ctx context.Context, chatID int64, messageID int, url string) error {
+func (m *MockImageSender) SendImageURLReply(_ context.Context, _ int64, _ int, url string) error {
 	m.Message = url
 	return m.err
 }
 
-func (m *MockImageSender) SendImageFileReply(ctx context.Context, chatID int64, messageID int, file []byte) error {
+func (m *MockImageSender) SendImageFileReply(_ context.Context, _ int64, _ int, file []byte) error {
 	m.Message = string(file)
 	return m.err
 }
@@ -52,8 +55,9 @@ func TestImageRepondSuccessful(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	assert.NoError(t, err)
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
+	require.NoError(t, err)
 
 	assert.Equal(t, "https://example.org/image.png", mi.Message)
 }
@@ -65,9 +69,9 @@ func TestImageRepondSendFailed(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	assert.Errorf(t, err, "mock error")
-
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
+	require.Errorf(t, err, "mock error")
 }
 
 func TestImageRepondErrorEmptyPrompt(t *testing.T) {
@@ -77,8 +81,9 @@ func TestImageRepondErrorEmptyPrompt(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image"})
-	assert.NoError(t, err)
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
+	require.NoError(t, err)
 
 	assert.Equal(t, "missing image prompt", mt.Message)
 }
@@ -90,8 +95,9 @@ func TestImageRepondErrorGenerating(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	assert.NoError(t, err)
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
+	require.NoError(t, err)
 
 	assert.Equal(t, "error getting FAL response: mock error", mt.Message)
 }
@@ -103,8 +109,9 @@ func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	assert.Errorf(t, err, "mock error")
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
+	require.Errorf(t, err, "mock error")
 
 	assert.Equal(t, "error getting FAL response: mock error", mt.Message)
 }
@@ -116,8 +123,9 @@ func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), &domain.Message{ChatID: 1, ID: 1, Text: "/image"})
-	assert.Errorf(t, err, "mock error")
+	err := imageHandler.Respond(context.Background(), time.Minute,
+		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
+	require.Errorf(t, err, "mock error")
 
 	assert.Equal(t, "missing image prompt", mt.Message)
 }

@@ -44,14 +44,19 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	go getOptionalImage(ctx, b, update, imageURL)
 	go getOptionalAudio(ctx, b, update, audioURL)
 
-	go commandHandler.Respond(ctx, h.timeout, &domain.Message{
-		ID:               update.Message.ID,
-		ChatID:           update.Message.Chat.ID,
-		Text:             update.Message.Text,
-		ReplyToMessageID: replyToMessageID,
-		ImageURL:         <-imageURL,
-		AudioURL:         <-audioURL,
-	})
+	go func() {
+		err := commandHandler.Respond(ctx, h.timeout, &domain.Message{
+			ID:               update.Message.ID,
+			ChatID:           update.Message.Chat.ID,
+			Text:             update.Message.Text,
+			ReplyToMessageID: replyToMessageID,
+			ImageURL:         <-imageURL,
+			AudioURL:         <-audioURL,
+		})
+		if err != nil {
+			log.Err(err).Str("command", cmd).Msg("failed to respond to command")
+		}
+	}()
 }
 
 func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, url chan string) {

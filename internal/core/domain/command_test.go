@@ -3,15 +3,17 @@ package domain
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type MockResponder struct {
 	command string
 }
 
-func (m *MockResponder) Respond(ctx context.Context, message *Message) error {
+func (m *MockResponder) Respond(_ context.Context, _ time.Duration, _ *Message) error {
 	return nil
 }
 
@@ -24,14 +26,14 @@ func TestRegister(t *testing.T) {
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
-	assert.Equal(t, 1, len(cr.commands))
+	assert.Len(t, cr.commands, 1)
 }
 
 func TestGetNotRegistered(t *testing.T) {
 	cr := &CommandRegistry{}
 
 	_, err := cr.Get("test")
-	assert.Errorf(t, err, "can't fetch commands, registry not initialized")
+	require.Errorf(t, err, "can't fetch commands, registry not initialized")
 }
 
 func TestGetCommandNotFound(t *testing.T) {
@@ -39,10 +41,10 @@ func TestGetCommandNotFound(t *testing.T) {
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
-	assert.Equal(t, 1, len(cr.commands))
+	assert.Len(t, cr.commands, 1)
 
 	_, err := cr.Get("/foo")
-	assert.Errorf(t, err, "command not found")
+	require.Errorf(t, err, "command not found")
 }
 
 func TestGetCommandFound(t *testing.T) {
@@ -50,10 +52,10 @@ func TestGetCommandFound(t *testing.T) {
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
-	assert.Equal(t, 1, len(cr.commands))
+	assert.Len(t, cr.commands, 1)
 
 	cmd, err := cr.Get("/test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cmd)
 
 	assert.Equal(t, "/test", cmd.GetCommand())
@@ -66,11 +68,11 @@ func TestListServices(t *testing.T) {
 
 	cr.Register(mr1)
 	cr.Register(mr2)
-	assert.Equal(t, 2, len(cr.commands))
+	assert.Len(t, cr.commands, 2)
 
 	list := cr.ListCommands()
 
-	assert.Equal(t, 2, len(list))
+	assert.Len(t, list, 2)
 	assert.Equal(t, "/foo", list[0])
 	assert.Equal(t, "/bar", list[1])
 }

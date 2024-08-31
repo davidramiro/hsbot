@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"hsbot/internal/adapters/file"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 const MaxPower = 100
@@ -53,22 +54,19 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 		return nil, err
 	}
 
-	size := MaxPower - (power / PowerFactor)
 	outFile := fmt.Sprintf("%sliq%s", strings.TrimSuffix(path, extension), extension)
-	dimensions := fmt.Sprintf("%d%%x%d%%", int(size), int(size))
+	command := createCommand(m.magickBinary, power, path, outFile)
 
 	defer file.RemoveTempFile(path)
 	defer file.RemoveTempFile(outFile)
 
-	args := append(m.magickBinary, path, "-liquid-rescale", dimensions, outFile)
-
-	log.Debug().Strs("args", args).
-		Str("dimensions", dimensions).
+	log.Debug().
+		Strs("command", command).
 		Str("outFile", outFile).
 		Str("path", path).
 		Msg("scaling image")
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(command[0], command[1:]...)
 	out, err := cmd.Output()
 	if err != nil {
 		log.Error().Bytes("magickStderr", out).Msg("magick commands failed")
@@ -78,4 +76,10 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 	log.Debug().Msg("magick commands finished")
 
 	return file.GetTempFile(outFile)
+}
+
+func createCommand(baseCommands []string, power float32, inFile, outFile string) []string {
+	size := MaxPower - (power / PowerFactor)
+	dimensions := fmt.Sprintf("%d%%x%d%%", int(size), int(size))
+	return append(baseCommands, inFile, "-liquid-rescale", dimensions, outFile)
 }
