@@ -39,7 +39,7 @@ func (c *ClaudeGenerator) GenerateFromPrompt(ctx context.Context, prompts []doma
 	}
 
 	resp, err := c.client.CreateMessages(ctx, anthropic.MessagesRequest{
-		Model:     anthropic.ModelClaude3Dot5Sonnet20240620,
+		Model:     anthropic.ModelClaude3Dot5Sonnet20241022,
 		System:    c.systemPrompt,
 		Messages:  messages,
 		MaxTokens: MaxTokens,
