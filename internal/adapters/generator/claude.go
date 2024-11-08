@@ -61,7 +61,7 @@ func createUserMessage(ctx context.Context, prompt domain.Prompt) (anthropic.Mes
 		return anthropic.Message{
 			Role: anthropic.RoleUser,
 			Content: []anthropic.MessageContent{
-				anthropic.NewImageMessageContent(anthropic.MessageContentImageSource{
+				anthropic.NewImageMessageContent(anthropic.MessageContentSource{
 					Type:      "base64",
 					MediaType: "image/jpeg",
 					Data:      f,
