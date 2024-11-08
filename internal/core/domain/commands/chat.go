@@ -81,7 +81,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 			},
 		}
 		conversation = h.cache[message.ChatID]
-		l.Debug().Int("message cache size", len(h.cache[message.ChatID].messages)).Msg("")
+		l.Debug().Int("message cache size", len(h.cache[message.ChatID].messages)).Send()
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
 			Prompt: promptText, ImageURL: message.ImageURL})
