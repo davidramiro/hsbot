@@ -34,8 +34,10 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	}
 
 	replyToMessageID := new(int)
+	var quotedText string
 	if update.Message.ReplyToMessage != nil {
 		*replyToMessageID = update.Message.ReplyToMessage.ID
+		quotedText = update.Message.ReplyToMessage.Text
 	}
 
 	imageURL := make(chan string)
@@ -50,6 +52,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			ChatID:           update.Message.Chat.ID,
 			Text:             update.Message.Text,
 			ReplyToMessageID: replyToMessageID,
+			QuotedText:       quotedText,
 			ImageURL:         <-imageURL,
 			AudioURL:         <-audioURL,
 		})

@@ -30,6 +30,7 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 		textGenerator: textGenerator,
 		textSender:    textSender,
 		command:       command,
+		cache:         make(map[int64]*Conversation),
 	}
 
 	go h.clearCache(cacheDuration, tickRate)
@@ -69,19 +70,14 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	conversation, ok := h.cache[message.ChatID]
 	if !ok {
 		l.Debug().Msg("new conversation")
-		h.cache = make(map[int64]*Conversation)
 
-		h.cache[message.ChatID] = &Conversation{
-			messages: []domain.Prompt{
-				{
-					Author:   domain.User,
-					Prompt:   promptText,
-					ImageURL: message.ImageURL,
-				},
-			},
-		}
+		h.cache[message.ChatID] = &Conversation{}
 		conversation = h.cache[message.ChatID]
-		l.Debug().Int("message cache size", len(h.cache[message.ChatID].messages)).Send()
+	}
+
+	if message.QuotedText != "" && message.ImageURL == "" {
+		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
+			Prompt: fmt.Sprintf("%s:%s", promptText, message.QuotedText)})
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
 			Prompt: promptText, ImageURL: message.ImageURL})
