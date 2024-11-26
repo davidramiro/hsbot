@@ -23,5 +23,5 @@ You are HSBot, a helpful assistant.
 
 [fal]
 api_key = "4242:1234"
-flux_url = "https://fal.run/fal-ai/flux-pro"
+flux_url = "https://fal.run/fal-ai/flux-pro/v1.1"
 whisper_url = "https://fal.run/fal-ai/whisper"

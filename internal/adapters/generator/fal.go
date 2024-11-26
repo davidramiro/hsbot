@@ -25,6 +25,7 @@ func NewFALGenerator(apiURL, apiKey string) *FALGenerator {
 type imageRequest struct {
 	Prompt              string `json:"prompt"`
 	EnableSafetyChecker bool   `json:"enable_safety_checker"`
+	SafetyTolerance     string `json:"safety_tolerance"`
 	ImageSize           string `json:"image_size"`
 }
 
@@ -41,6 +42,7 @@ func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (s
 		Prompt:              prompt,
 		EnableSafetyChecker: false,
 		ImageSize:           "square",
+		SafetyTolerance:     "5",
 	}
 
 	payloadBuf := new(bytes.Buffer)
