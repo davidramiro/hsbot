@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/go-telegram/bot v1.11.1
 	github.com/gofrs/uuid/v5 v5.3.0
-	github.com/liushuangls/go-anthropic/v2 v2.12.2
+	github.com/liushuangls/go-anthropic/v2 v2.13.0
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
