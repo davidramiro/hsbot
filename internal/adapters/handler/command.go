@@ -24,12 +24,16 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
+	if update.Message.Photo != nil {
+		update.Message.Text = update.Message.Caption
+	}
+
 	log.Debug().Str("message", update.Message.Text).Msg("registering chat command handler")
 
 	cmd := domain.ParseCommand(update.Message.Text)
 	commandHandler, err := h.commandRegistry.Get(cmd)
 	if err != nil {
-		log.Debug().Str("commands", cmd).Msg("no handler for commands")
+		log.Debug().Str("command", cmd).Msg("no handler for command")
 		return
 	}
 

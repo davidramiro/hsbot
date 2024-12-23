@@ -62,5 +62,5 @@ func ParseCommandArgs(args string) string {
 
 func ParseCommand(args string) string {
 	command := strings.Split(args, " ")
-	return command[0]
+	return strings.ToLower(command[0])
 }

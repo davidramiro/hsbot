@@ -89,6 +89,7 @@ func main() {
 	commandHandler := handler.NewCommandHandler(commandRegistry, handlerTimeout)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
 
 	log.Info().Msg("bot listening")
 	b.Start(ctx)
