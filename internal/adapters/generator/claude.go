@@ -24,17 +24,17 @@ func NewClaudeGenerator(apiKey, systemPrompt string) *ClaudeGenerator {
 }
 
 func (c *ClaudeGenerator) GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (string, error) {
-	var messages []anthropic.Message
+	messages := make([]anthropic.Message, len(prompts))
 
-	for _, prompt := range prompts {
+	for i, prompt := range prompts {
 		if prompt.Author == domain.System {
-			messages = append(messages, anthropic.NewAssistantTextMessage(prompt.Prompt))
+			messages[i] = anthropic.NewAssistantTextMessage(prompt.Prompt)
 		} else if prompt.Author == domain.User {
 			message, err := createUserMessage(ctx, prompt)
 			if err != nil {
 				return "", err
 			}
-			messages = append(messages, message)
+			messages[i] = message
 		}
 	}
 

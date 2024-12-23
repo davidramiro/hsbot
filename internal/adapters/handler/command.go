@@ -39,7 +39,16 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 
 	replyToMessageID := new(int)
 	var quotedText string
+	var isReplyToBot bool
 	if update.Message.ReplyToMessage != nil {
+		botUser, err := b.GetMe(ctx)
+		if err != nil {
+			log.Debug().Str("command", cmd).Msg("failed to get bot user")
+			return
+		}
+		if update.Message.ReplyToMessage.From.ID == botUser.ID {
+			isReplyToBot = true
+		}
 		*replyToMessageID = update.Message.ReplyToMessage.ID
 		quotedText = update.Message.ReplyToMessage.Text
 	}
@@ -56,6 +65,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			ChatID:           update.Message.Chat.ID,
 			Text:             update.Message.Text,
 			ReplyToMessageID: replyToMessageID,
+			IsReplyToBot:     isReplyToBot,
 			QuotedText:       quotedText,
 			ImageURL:         <-imageURL,
 			AudioURL:         <-audioURL,
@@ -66,7 +76,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	}()
 }
 
-func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, url chan string) {
+func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
 	var photos []models.PhotoSize
 
 	if update.Message.Photo != nil {
@@ -94,7 +104,7 @@ func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, ur
 	url <- b.FileDownloadLink(f)
 }
 
-func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, url chan string) {
+func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
 	var fileID string
 	if update.Message.Audio != nil {
 		fileID = update.Message.Audio.FileID

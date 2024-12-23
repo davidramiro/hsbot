@@ -76,8 +76,14 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	}
 
 	if message.QuotedText != "" && message.ImageURL == "" {
+		// if there's a user message being replied to, add the previous message to the context
+		if !message.IsReplyToBot {
+			conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
+				Prompt: message.QuotedText})
+		}
+
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
-			Prompt: fmt.Sprintf("%s:%s", promptText, message.QuotedText)})
+			Prompt: message.Text})
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
 			Prompt: promptText, ImageURL: message.ImageURL})
