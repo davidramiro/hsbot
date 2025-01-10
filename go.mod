@@ -3,7 +3,7 @@ module hsbot
 go 1.22
 
 require (
-	github.com/go-telegram/bot v1.12.1
+	github.com/go-telegram/bot v1.13.1
 	github.com/gofrs/uuid/v5 v5.3.0
 	github.com/liushuangls/go-anthropic/v2 v2.13.0
 	github.com/rs/zerolog v1.33.0
