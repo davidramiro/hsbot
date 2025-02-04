@@ -14,6 +14,7 @@ import (
 type ChatHandler struct {
 	textGenerator port.TextGenerator
 	textSender    port.TextSender
+	transcriber   port.Transcriber
 	command       string
 	cache         map[int64]*Conversation
 	mutex         sync.Mutex
@@ -24,11 +25,12 @@ type Conversation struct {
 	messages  []domain.Prompt
 }
 
-func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, command string,
-	cacheDuration, tickRate time.Duration) *ChatHandler {
+func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
+	command string, cacheDuration, tickRate time.Duration) *ChatHandler {
 	h := &ChatHandler{
 		textGenerator: textGenerator,
 		textSender:    textSender,
+		transcriber:   transcriber,
 		command:       command,
 		cache:         make(map[int64]*Conversation),
 	}
@@ -64,6 +66,16 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 			return err
 		}
 		return nil
+	}
+
+	if message.AudioURL != "" {
+		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
+		if err != nil {
+			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
+			return err
+		}
+
+		promptText += ": " + transcript
 	}
 
 	h.mutex.Lock()
