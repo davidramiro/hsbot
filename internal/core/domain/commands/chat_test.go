@@ -36,8 +36,9 @@ func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Act
 func TestChatHandlerClearingCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
@@ -56,8 +57,9 @@ func TestChatHandlerClearingCache(t *testing.T) {
 func TestChatHandlerCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
@@ -83,8 +85,9 @@ func TestChatHandlerCache(t *testing.T) {
 func TestGeneratorError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
@@ -98,8 +101,9 @@ func TestGeneratorError(t *testing.T) {
 func TestEmptyPromptError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
@@ -113,8 +117,9 @@ func TestEmptyPromptError(t *testing.T) {
 func TestSendMessageError(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{err: errors.New("mock error")}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
@@ -128,8 +133,9 @@ func TestSendMessageError(t *testing.T) {
 func TestSendGenerateErrorAndMessageError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{err: errors.New("mock error")}
+	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms,
+	chatHandler := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3, time.Second)
 
 	assert.NotNil(t, chatHandler)
