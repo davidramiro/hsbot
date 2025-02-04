@@ -67,6 +67,8 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	}
 
 	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
 	conversation, ok := h.cache[message.ChatID]
 	if !ok {
 		l.Debug().Msg("new conversation")
@@ -74,6 +76,8 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		h.cache[message.ChatID] = &Conversation{}
 		conversation = h.cache[message.ChatID]
 	}
+
+	conversation.timestamp = time.Now()
 
 	if message.QuotedText != "" && message.ImageURL == "" {
 		// if there's a user message being replied to, add the previous message to the context
@@ -91,7 +95,9 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 	response, err := h.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
 	if err != nil {
-		err := h.textSender.SendMessageReply(ctx,
+		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
+
+		err = h.textSender.SendMessageReply(ctx,
 			message.ChatID,
 			message.ID,
 			fmt.Sprintf("failed to generate reply: %s", err))
@@ -104,9 +110,6 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	}
 
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
-	conversation.timestamp = time.Now()
-
-	h.mutex.Unlock()
 
 	err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
@@ -114,11 +117,9 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		response)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-		cancel()
 		return err
 	}
 
-	cancel()
 	return nil
 }
 
