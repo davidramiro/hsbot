@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-//go:generate mockery --name TelegramBot
+const TelegramMessageLimit = 4096
 
 type TelegramSender struct {
 	bot *bot.Bot
@@ -23,16 +23,24 @@ func NewTelegramSender(bot *bot.Bot) *TelegramSender {
 }
 
 func (s *TelegramSender) SendMessageReply(ctx context.Context, chatID int64, messageID int, message string) error {
-	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: chatID,
-		Text:   message,
-		ReplyParameters: &models.ReplyParameters{
-			MessageID: messageID,
-			ChatID:    chatID,
-		},
-	})
+	replies := (len(message) + TelegramMessageLimit - 1) / TelegramMessageLimit
+	for i := range replies {
+		substr := message[i*TelegramMessageLimit : min(len(message), (i+1)*TelegramMessageLimit)]
+		_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   substr,
+			ReplyParameters: &models.ReplyParameters{
+				MessageID: messageID,
+				ChatID:    chatID,
+			},
+		})
 
-	return err
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *TelegramSender) SendImageURLReply(ctx context.Context, chatID int64, messageID int, url string) error {
