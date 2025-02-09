@@ -16,6 +16,7 @@ type Prompt struct {
 type Message struct {
 	ID               int
 	ChatID           int64
+	Username         string
 	ReplyToMessageID *int
 	IsReplyToBot     bool
 	QuotedText       string

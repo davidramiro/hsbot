@@ -64,21 +64,23 @@ func TestChatHandlerCache(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
 	assert.Len(t, chatHandler.cache, 1)
 
-	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 2, Text: "/chat prompt2"})
+	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
 	require.NoError(t, err)
 	assert.Len(t, chatHandler.cache, 1)
 
 	assert.Len(t, chatHandler.cache[1].messages, 4)
 
-	assert.Equal(t, "prompt", chatHandler.cache[1].messages[0].Prompt)
+	assert.Equal(t, "@unit: prompt", chatHandler.cache[1].messages[0].Prompt)
 	assert.Equal(t, "mock response", chatHandler.cache[1].messages[1].Prompt)
-	assert.Equal(t, "prompt2", chatHandler.cache[1].messages[2].Prompt)
+	assert.Equal(t, "@unit: prompt2", chatHandler.cache[1].messages[2].Prompt)
 	assert.Equal(t, "mock response", chatHandler.cache[1].messages[3].Prompt)
 }
 

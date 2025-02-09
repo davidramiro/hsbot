@@ -78,6 +78,8 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		promptText += ": " + transcript
 	}
 
+	promptText = message.Username + ": " + promptText
+
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
@@ -99,7 +101,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		}
 
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
-			Prompt: message.Text})
+			Prompt: promptText})
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
 			Prompt: promptText, ImageURL: message.ImageURL})

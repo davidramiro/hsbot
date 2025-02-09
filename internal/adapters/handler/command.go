@@ -48,9 +48,13 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		}
 		if update.Message.ReplyToMessage.From.ID == botUser.ID {
 			isReplyToBot = true
+			quotedText = update.Message.ReplyToMessage.Text
+		} else {
+			quotedText = getUserNameFromMessage(update.Message.ReplyToMessage.From) + ": " +
+				update.Message.ReplyToMessage.Text
 		}
+
 		*replyToMessageID = update.Message.ReplyToMessage.ID
-		quotedText = update.Message.ReplyToMessage.Text
 	}
 
 	imageURL := make(chan string)
@@ -64,6 +68,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			ID:               update.Message.ID,
 			ChatID:           update.Message.Chat.ID,
 			Text:             update.Message.Text,
+			Username:         getUserNameFromMessage(update.Message.From),
 			ReplyToMessageID: replyToMessageID,
 			IsReplyToBot:     isReplyToBot,
 			QuotedText:       quotedText,
@@ -146,4 +151,12 @@ func findLargestImage(photos []models.PhotoSize) string {
 	}
 
 	return maxID
+}
+
+func getUserNameFromMessage(user *models.User) string {
+	if user.Username == "" {
+		return user.FirstName
+	}
+
+	return "@" + user.Username
 }

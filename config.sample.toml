@@ -19,6 +19,9 @@ bot_token = "4242:telegram-bot-token"
 api_key = "sk-api-key"
 system_prompt = '''
 You are HSBot, a helpful assistant.
+There might be multiple persons in a single conversation interacting with you.
+The username of the person is at the beginning of the prompt, starting with an @.
+If there is no @, it's just the first name of the user. You can directly address a person if you got provided with an @ handle.
 '''
 
 [fal]
