@@ -14,9 +14,10 @@ import (
 
 func TestDownloadFile(t *testing.T) {
 	want := []byte("test\n")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write(want)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(want)
+		assert.NoError(t, err)
 	}))
 	defer srv.Close()
 
@@ -28,9 +29,10 @@ func TestDownloadFile(t *testing.T) {
 
 func TestSaveTemp(t *testing.T) {
 	want := []byte("test\n")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write(want)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(want)
+		assert.NoError(t, err)
 	}))
 	defer srv.Close()
 
@@ -50,9 +52,10 @@ func TestSaveTemp(t *testing.T) {
 
 func TestGetTemp(t *testing.T) {
 	want := []byte("test\n")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write(want)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(want)
+		assert.NoError(t, err)
 	}))
 	defer srv.Close()
 

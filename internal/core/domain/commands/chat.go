@@ -24,7 +24,6 @@ type ChatHandler struct {
 type Conversation struct {
 	timestamp  time.Time
 	messages   []domain.Prompt
-	timer      *time.Timer
 	exitSignal chan struct{}
 	chatID     int64
 }
