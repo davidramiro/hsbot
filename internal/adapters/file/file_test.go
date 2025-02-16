@@ -2,6 +2,8 @@ package file
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -11,14 +13,28 @@ import (
 )
 
 func TestDownloadFile(t *testing.T) {
-	res, err := DownloadFile(context.Background(), "https://kore.cc/test.txt")
+	want := []byte("test\n")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write(want)
+	}))
+	defer srv.Close()
+
+	res, err := DownloadFile(context.Background(), srv.URL)
 	require.NoError(t, err)
 
-	assert.Equal(t, []byte("test\n"), res)
+	assert.Equal(t, want, res)
 }
 
 func TestSaveTemp(t *testing.T) {
-	res, err := DownloadFile(context.Background(), "https://kore.cc/test.txt")
+	want := []byte("test\n")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write(want)
+	}))
+	defer srv.Close()
+
+	res, err := DownloadFile(context.Background(), srv.URL)
 	require.NoError(t, err)
 
 	path, err := SaveTempFile(res, "txt")
@@ -33,7 +49,14 @@ func TestSaveTemp(t *testing.T) {
 }
 
 func TestGetTemp(t *testing.T) {
-	res, err := DownloadFile(context.Background(), "https://kore.cc/test.txt")
+	want := []byte("test\n")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write(want)
+	}))
+	defer srv.Close()
+
+	res, err := DownloadFile(context.Background(), srv.URL)
 	require.NoError(t, err)
 
 	path, err := SaveTempFile(res, "txt")
@@ -47,5 +70,5 @@ func TestGetTemp(t *testing.T) {
 
 	file, err := GetTempFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, []byte("test\n"), file)
+	assert.Equal(t, want, file)
 }

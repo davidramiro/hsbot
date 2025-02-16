@@ -69,14 +69,8 @@ func main() {
 		log.Panic().Err(err).Msg("invalid timeout for chat context in config")
 	}
 
-	convoTickrate, err := time.ParseDuration(viper.GetString("chat.context_tickrate"))
-	if err != nil {
-		log.Panic().Err(err).Msg("invalid tickrate for chat context in config")
-	}
-
 	commandRegistry := &domain.CommandRegistry{}
-	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, transcriber, "/chat",
-		convoTimeout, convoTickrate))
+	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, transcriber, "/chat", convoTimeout))
 	commandRegistry.Register(commands.NewImageHandler(fluxGenerator, s, s, "/image"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
 	commandRegistry.Register(commands.NewTranscribeHandler(transcriber, s, "/transcribe"))

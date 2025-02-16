@@ -15,27 +15,30 @@ type ChatHandler struct {
 	textGenerator port.TextGenerator
 	textSender    port.TextSender
 	transcriber   port.Transcriber
+	cacheDuration time.Duration
 	command       string
 	cache         map[int64]*Conversation
 	mutex         sync.Mutex
 }
 
 type Conversation struct {
-	timestamp time.Time
-	messages  []domain.Prompt
+	timestamp  time.Time
+	messages   []domain.Prompt
+	timer      *time.Timer
+	exitSignal chan struct{}
+	chatID     int64
 }
 
 func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
-	command string, cacheDuration, tickRate time.Duration) *ChatHandler {
+	command string, cacheDuration time.Duration) *ChatHandler {
 	h := &ChatHandler{
 		textGenerator: textGenerator,
 		textSender:    textSender,
 		transcriber:   transcriber,
+		cacheDuration: cacheDuration,
 		command:       command,
 		cache:         make(map[int64]*Conversation),
 	}
-
-	go h.clearCache(cacheDuration, tickRate)
 
 	return h
 }
@@ -87,8 +90,13 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	if !ok {
 		l.Debug().Msg("new conversation")
 
-		h.cache[message.ChatID] = &Conversation{}
+		h.cache[message.ChatID] = &Conversation{
+			chatID:     message.ChatID,
+			exitSignal: make(chan struct{}),
+		}
 		conversation = h.cache[message.ChatID]
+	} else {
+		conversation.exitSignal <- struct{}{}
 	}
 
 	conversation.timestamp = time.Now()
@@ -125,6 +133,8 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
 
+	go h.startConversationTimer(conversation)
+
 	err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
 		message.ID,
@@ -137,18 +147,21 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	return nil
 }
 
-func (h *ChatHandler) clearCache(timeout, tick time.Duration) {
-	log.Debug().Msg("gpt cache timer started")
+func (h *ChatHandler) startConversationTimer(convo *Conversation) {
+	t := time.NewTimer(h.cacheDuration)
 
-	for range time.Tick(tick) {
-		log.Debug().Msg("tick, checking if cache should expire")
-		for chatID := range h.cache {
-			log.Debug().Int64("chatID", chatID).Msg("checking timestamp for id")
-			messageTime := h.cache[chatID].timestamp
-			if messageTime.Add(timeout).Before(time.Now()) {
-				log.Debug().Int64("chatID", chatID).Msg("expired chat, resetting")
-				delete(h.cache, chatID)
-			}
+	for {
+		select {
+		case <-t.C:
+			log.Debug().Int64("chatID", convo.chatID).Msg("clearing conversation")
+
+			h.mutex.Lock()
+			delete(h.cache, convo.chatID)
+			h.mutex.Unlock()
+			return
+		case <-convo.exitSignal:
+			t.Stop()
+			return
 		}
 	}
 }

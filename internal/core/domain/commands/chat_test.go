@@ -39,7 +39,7 @@ func TestChatHandlerClearingCache(t *testing.T) {
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -60,7 +60,7 @@ func TestChatHandlerCache(t *testing.T) {
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -84,13 +84,54 @@ func TestChatHandlerCache(t *testing.T) {
 	assert.Equal(t, "mock response", chatHandler.cache[1].messages[3].Prompt)
 }
 
+func TestChatHandlerCacheResetTimeout(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+
+	chatHandler := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "mock response", ms.Message)
+	assert.Len(t, chatHandler.cache, 1)
+
+	time.Sleep(time.Second * 2)
+
+	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
+	require.NoError(t, err)
+	assert.Len(t, chatHandler.cache, 1)
+
+	time.Sleep(time.Second * 2)
+
+	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt3"})
+	require.NoError(t, err)
+	assert.Len(t, chatHandler.cache, 1)
+
+	assert.Len(t, chatHandler.cache[1].messages, 6)
+
+	assert.Equal(t, "@unit: prompt", chatHandler.cache[1].messages[0].Prompt)
+	assert.Equal(t, "mock response", chatHandler.cache[1].messages[1].Prompt)
+	assert.Equal(t, "@unit: prompt2", chatHandler.cache[1].messages[2].Prompt)
+	assert.Equal(t, "mock response", chatHandler.cache[1].messages[3].Prompt)
+	assert.Equal(t, "@unit: prompt3", chatHandler.cache[1].messages[4].Prompt)
+	assert.Equal(t, "mock response", chatHandler.cache[1].messages[5].Prompt)
+}
+
 func TestGeneratorError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -106,7 +147,7 @@ func TestEmptyPromptError(t *testing.T) {
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -122,7 +163,7 @@ func TestSendMessageError(t *testing.T) {
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -138,7 +179,7 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 	mt := &MockTranscriber{}
 
 	chatHandler := NewChatHandler(mg, ms, mt,
-		"/chat", time.Second*3, time.Second)
+		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
