@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
@@ -17,8 +18,7 @@ type ChatHandler struct {
 	transcriber   port.Transcriber
 	cacheDuration time.Duration
 	command       string
-	cache         map[int64]*Conversation
-	mutex         sync.Mutex
+	cache         sync.Map
 }
 
 type Conversation struct {
@@ -36,7 +36,6 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 		transcriber:   transcriber,
 		cacheDuration: cacheDuration,
 		command:       command,
-		cache:         make(map[int64]*Conversation),
 	}
 
 	return h
@@ -60,45 +59,45 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
-	promptText := domain.ParseCommandArgs(message.Text)
+	promptText, err := h.extractPrompt(ctx, message)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to extract prompt text")
+	}
+
 	if promptText == "" {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
+		log.Debug().Msg(domain.ErrEmptyPrompt)
 		return nil
 	}
 
-	if message.AudioURL != "" {
-		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
-
-		promptText += ": " + transcript
-	}
-
-	promptText = message.Username + ": " + promptText
-
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	conversation, ok := h.cache[message.ChatID]
+	var conversation *Conversation
+	c, ok := h.cache.Load(message.ChatID)
 	if !ok {
 		l.Debug().Msg("new conversation")
 
-		h.cache[message.ChatID] = &Conversation{
+		h.cache.Store(message.ChatID, &Conversation{
 			chatID:     message.ChatID,
 			exitSignal: make(chan struct{}),
+		})
+		c, _ = h.cache.Load(message.ChatID)
+		conversation, ok = c.(*Conversation)
+		if !ok {
+			err := errors.New("conversation type error")
+			l.Error().Err(err).Send()
+			return err
 		}
-		conversation = h.cache[message.ChatID]
 	} else {
+		conversation, ok = c.(*Conversation)
+		if !ok {
+			err := errors.New("conversation type error")
+			l.Error().Err(err).Send()
+			return err
+		}
+		l.Debug().Msg("existing conversation, stopping timer")
 		conversation.exitSignal <- struct{}{}
 	}
 
 	conversation.timestamp = time.Now()
+	go h.startConversationTimer(conversation)
 
 	if message.QuotedText != "" && message.ImageURL == "" {
 		// if there's a user message being replied to, add the previous message to the context
@@ -116,6 +115,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 	response, err := h.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
 	if err != nil {
+		l.Error().Err(err).Msg("failed to generate prompt")
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
 
 		err = h.textSender.SendMessageReply(ctx,
@@ -130,9 +130,8 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		return nil
 	}
 
+	l.Debug().Msg("reply generated")
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
-
-	go h.startConversationTimer(conversation)
 
 	err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
@@ -146,6 +145,37 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	return nil
 }
 
+func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, error) {
+	l := log.With().
+		Int("messageId", message.ID).
+		Int64("chatId", message.ChatID).
+		Str("command", h.GetCommand()).
+		Logger()
+
+	promptText := domain.ParseCommandArgs(message.Text)
+	if promptText == "" {
+		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
+		if err != nil {
+			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
+			return "", err
+		}
+		return "", nil
+	}
+
+	if message.AudioURL != "" {
+		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
+		if err != nil {
+			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
+			return "", err
+		}
+
+		promptText += ": " + transcript
+	}
+
+	promptText = message.Username + ": " + promptText
+	return promptText, nil
+}
+
 func (h *ChatHandler) startConversationTimer(convo *Conversation) {
 	t := time.NewTimer(h.cacheDuration)
 
@@ -153,10 +183,7 @@ func (h *ChatHandler) startConversationTimer(convo *Conversation) {
 		select {
 		case <-t.C:
 			log.Debug().Int64("chatID", convo.chatID).Msg("clearing conversation")
-
-			h.mutex.Lock()
-			delete(h.cache, convo.chatID)
-			h.mutex.Unlock()
+			h.cache.Delete(convo.chatID)
 			return
 		case <-convo.exitSignal:
 			t.Stop()

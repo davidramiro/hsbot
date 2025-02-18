@@ -36,6 +36,7 @@ func (s *TelegramSender) SendMessageReply(ctx context.Context, chatID int64, mes
 		})
 
 		if err != nil {
+			log.Error().Err(err).Msg("failed to send text response")
 			return err
 		}
 	}
@@ -75,7 +76,7 @@ func (s *TelegramSender) SendImageFileReply(ctx context.Context, chatID int64, m
 
 	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send photo response")
+		log.Error().Err(err).Msg("failed to send file response")
 		return err
 	}
 

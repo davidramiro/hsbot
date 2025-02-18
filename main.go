@@ -12,6 +12,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/go-telegram/bot/models"
+
 	"github.com/rs/zerolog"
 
 	"github.com/go-telegram/bot"
@@ -48,7 +50,11 @@ func main() {
 	defer cancel()
 
 	token := viper.GetString("telegram.bot_token")
-	b, err := bot.New(token)
+	opts := []bot.Option{
+		bot.WithDefaultHandler(noOpHandler),
+	}
+
+	b, err := bot.New(token, opts...)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
@@ -88,3 +94,5 @@ func main() {
 	log.Info().Msg("bot listening")
 	b.Start(ctx)
 }
+
+func noOpHandler(_ context.Context, _ *bot.Bot, _ *models.Update) {}
