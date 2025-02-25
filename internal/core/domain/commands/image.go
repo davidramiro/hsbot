@@ -48,7 +48,7 @@ func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, messa
 
 	prompt := domain.ParseCommandArgs(message.Text)
 	if prompt == "" {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "missing image prompt")
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "missing image prompt")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			return err
@@ -60,7 +60,7 @@ func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	if err != nil {
 		errMsg := "error getting FAL response"
 		l.Error().Err(err).Str("imageURL", imageURL).Msg(errMsg)
-		err := h.textSender.SendMessageReply(ctx,
+		_, err := h.textSender.SendMessageReply(ctx,
 			message.ChatID,
 			message.ID,
 			fmt.Sprintf("%s: %s", errMsg, err))

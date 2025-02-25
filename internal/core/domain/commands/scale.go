@@ -43,7 +43,7 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
 
 	if message.ImageURL == "" || message.ReplyToMessageID == nil {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
 			"reply to an image")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
@@ -61,7 +61,7 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	} else {
 		power, err = strconv.ParseFloat(args, 32)
 		if err != nil {
-			err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
+			_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
 				"usage: /scale or /scale <power>, 1-100")
 			if err != nil {
 				l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
@@ -73,7 +73,7 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 
 	rescaled, err := h.imageConverter.Scale(ctx, message.ImageURL, float32(power))
 	if err != nil {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
 			fmt.Sprintf("failed to scale image: %s", err))
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)

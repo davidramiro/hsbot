@@ -78,6 +78,7 @@ func main() {
 	commandRegistry := &domain.CommandRegistry{}
 	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, transcriber, "/chat", convoTimeout))
 	commandRegistry.Register(commands.NewImageHandler(fluxGenerator, s, s, "/image"))
+	commandRegistry.Register(commands.NewThinkHandler(claudeGenerator, s, transcriber, "/think"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
 	commandRegistry.Register(commands.NewTranscribeHandler(transcriber, s, "/transcribe"))
 

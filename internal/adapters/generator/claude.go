@@ -9,7 +9,8 @@ import (
 	"github.com/liushuangls/go-anthropic/v2"
 )
 
-const MaxTokens = 5000
+const MaxTokens = 8192
+const MaxThinkingTokens = 2048
 
 type ClaudeGenerator struct {
 	client       *anthropic.Client
@@ -39,7 +40,7 @@ func (c *ClaudeGenerator) GenerateFromPrompt(ctx context.Context, prompts []doma
 	}
 
 	resp, err := c.client.CreateMessages(ctx, anthropic.MessagesRequest{
-		Model:     anthropic.ModelClaude3Dot5Sonnet20241022,
+		Model:     anthropic.ModelClaude3Dot7SonnetLatest,
 		System:    c.systemPrompt,
 		Messages:  messages,
 		MaxTokens: MaxTokens,
@@ -49,6 +50,43 @@ func (c *ClaudeGenerator) GenerateFromPrompt(ctx context.Context, prompts []doma
 	}
 
 	return resp.Content[0].GetText(), nil
+}
+
+func (c *ClaudeGenerator) ThinkFromPrompt(ctx context.Context, prompt domain.Prompt) (string, string, error) {
+	messages := make([]anthropic.Message, 1)
+
+	message, err := createUserMessage(ctx, prompt)
+	if err != nil {
+		return "", "", err
+	}
+
+	messages[0] = message
+
+	resp, err := c.client.CreateMessages(ctx, anthropic.MessagesRequest{
+		Model:     anthropic.ModelClaude3Dot7SonnetLatest,
+		Messages:  messages,
+		MaxTokens: MaxTokens,
+		Thinking: &anthropic.Thinking{
+			Type:         anthropic.ThinkingTypeEnabled,
+			BudgetTokens: MaxThinkingTokens,
+		},
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("claude API error: %w", err)
+	}
+
+	var thoughts string
+	var answer string
+
+	for _, msg := range resp.Content {
+		if msg.Type == anthropic.MessagesContentTypeThinking && msg.MessageContentThinking != nil {
+			thoughts = msg.MessageContentThinking.Thinking
+		} else if msg.Type == anthropic.MessagesContentTypeText {
+			answer = msg.GetText()
+		}
+	}
+
+	return thoughts, answer, nil
 }
 
 func createUserMessage(ctx context.Context, prompt domain.Prompt) (anthropic.Message, error) {

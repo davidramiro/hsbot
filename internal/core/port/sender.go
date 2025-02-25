@@ -6,7 +6,7 @@ import (
 )
 
 type TextSender interface {
-	SendMessageReply(ctx context.Context, chatID int64, messageID int, message string) error
+	SendMessageReply(ctx context.Context, chatID int64, messageID int, message string) (int, error)
 	SendChatAction(ctx context.Context, chatID int64, action domain.Action)
 }
 

@@ -18,6 +18,7 @@ type Message struct {
 	ChatID           int64
 	Username         string
 	ReplyToMessageID *int
+	ReplyToUsername  string
 	IsReplyToBot     bool
 	QuotedText       string
 	ImageURL         string

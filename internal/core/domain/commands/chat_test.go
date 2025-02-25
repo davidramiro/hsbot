@@ -12,13 +12,18 @@ import (
 )
 
 type MockTextGenerator struct {
-	response string
-	err      error
-	Message  string
+	response        string
+	thoughtResponse string
+	err             error
+	Message         string
 }
 
 func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (string, error) {
 	return m.response, m.err
+}
+
+func (m *MockTextGenerator) ThinkFromPrompt(_ context.Context, _ domain.Prompt) (string, string, error) {
+	return m.response, m.thoughtResponse, m.err
 }
 
 type MockTextSender struct {
@@ -26,9 +31,9 @@ type MockTextSender struct {
 	Message string
 }
 
-func (m *MockTextSender) SendMessageReply(_ context.Context, _ int64, _ int, message string) error {
+func (m *MockTextSender) SendMessageReply(_ context.Context, _ int64, _ int, message string) (int, error) {
 	m.Message = message
-	return m.err
+	return 0, m.err
 }
 
 func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {}

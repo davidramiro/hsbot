@@ -22,11 +22,17 @@ func NewTelegramSender(bot *bot.Bot) *TelegramSender {
 	return &TelegramSender{bot: bot}
 }
 
-func (s *TelegramSender) SendMessageReply(ctx context.Context, chatID int64, messageID int, message string) error {
+func (s *TelegramSender) SendMessageReply(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	message string) (int, error) {
 	replies := (len(message) + TelegramMessageLimit - 1) / TelegramMessageLimit
+	lastSentID := -1
+
 	for i := range replies {
 		substr := message[i*TelegramMessageLimit : min(len(message), (i+1)*TelegramMessageLimit)]
-		_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+		sent, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   substr,
 			ReplyParameters: &models.ReplyParameters{
@@ -34,14 +40,15 @@ func (s *TelegramSender) SendMessageReply(ctx context.Context, chatID int64, mes
 				ChatID:    chatID,
 			},
 		})
-
 		if err != nil {
 			log.Error().Err(err).Msg("failed to send text response")
-			return err
+			return -1, err
 		}
+
+		lastSentID = sent.ID
 	}
 
-	return nil
+	return lastSentID, nil
 }
 
 func (s *TelegramSender) SendImageURLReply(ctx context.Context, chatID int64, messageID int, url string) error {

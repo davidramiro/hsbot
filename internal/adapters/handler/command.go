@@ -40,6 +40,8 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	replyToMessageID := new(int)
 	var quotedText string
 	var isReplyToBot bool
+	var replyToUsername string
+
 	if update.Message.ReplyToMessage != nil {
 		botUser, err := b.GetMe(ctx)
 		if err != nil {
@@ -50,8 +52,8 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			isReplyToBot = true
 			quotedText = update.Message.ReplyToMessage.Text
 		} else {
-			quotedText = getUserNameFromMessage(update.Message.ReplyToMessage.From) + ": " +
-				update.Message.ReplyToMessage.Text
+			replyToUsername = update.Message.ReplyToMessage.From.Username
+			quotedText = update.Message.ReplyToMessage.Text
 		}
 
 		*replyToMessageID = update.Message.ReplyToMessage.ID
@@ -70,6 +72,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			Text:             update.Message.Text,
 			Username:         getUserNameFromMessage(update.Message.From),
 			ReplyToMessageID: replyToMessageID,
+			ReplyToUsername:  replyToUsername,
 			IsReplyToBot:     isReplyToBot,
 			QuotedText:       quotedText,
 			ImageURL:         <-imageURL,

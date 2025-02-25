@@ -40,7 +40,7 @@ func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, 
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
 	if message.AudioURL == "" {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "reply to an audio")
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "reply to an audio")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			return err
@@ -51,7 +51,7 @@ func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, 
 
 	resp, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
 	if err != nil {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, fmt.Sprintf("transcription failed: %s", err))
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, fmt.Sprintf("transcription failed: %s", err))
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 
@@ -68,7 +68,7 @@ func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, 
 		replyToID = message.ID
 	}
 
-	err = h.textSender.SendMessageReply(ctx, message.ChatID, replyToID, resp)
+	_, err = h.textSender.SendMessageReply(ctx, message.ChatID, replyToID, resp)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 

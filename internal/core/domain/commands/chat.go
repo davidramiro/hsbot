@@ -103,7 +103,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		// if there's a user message being replied to, add the previous message to the context
 		if !message.IsReplyToBot {
 			conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
-				Prompt: message.QuotedText})
+				Prompt: message.ReplyToUsername + ": " + message.QuotedText})
 		}
 
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
@@ -118,7 +118,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		l.Error().Err(err).Msg("failed to generate prompt")
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
 
-		err = h.textSender.SendMessageReply(ctx,
+		_, err = h.textSender.SendMessageReply(ctx,
 			message.ChatID,
 			message.ID,
 			fmt.Sprintf("failed to generate reply: %s", err))
@@ -133,7 +133,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	l.Debug().Msg("reply generated")
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
 
-	err = h.textSender.SendMessageReply(ctx,
+	_, err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
 		message.ID,
 		response)
@@ -154,7 +154,7 @@ func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message
 
 	promptText := domain.ParseCommandArgs(message.Text)
 	if promptText == "" {
-		err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 			return "", err
