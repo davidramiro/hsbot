@@ -13,18 +13,18 @@ import (
 )
 
 type FALGenerator struct {
-	falApiKey     string
-	fluxApiURL    string
-	whisperApiURL string
-	omnigenApiURL string
+	falAPIKey     string
+	fluxAPIURL    string
+	whisperAPIURL string
+	omnigenAPIURL string
 }
 
-func NewFALGenerator(fluxApiURL, omnigenApiURL, whisperApiURL, apiKey string) *FALGenerator {
+func NewFALGenerator(fluxAPIURL, omnigenAPIURL, whisperAPIURL, apiKey string) *FALGenerator {
 	return &FALGenerator{
-		falApiKey:     apiKey,
-		fluxApiURL:    fluxApiURL,
-		whisperApiURL: whisperApiURL,
-		omnigenApiURL: omnigenApiURL,
+		falAPIKey:     apiKey,
+		fluxAPIURL:    fluxAPIURL,
+		whisperAPIURL: whisperAPIURL,
+		omnigenAPIURL: omnigenAPIURL,
 	}
 }
 
@@ -66,7 +66,7 @@ func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (s
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.fluxApiURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.fluxAPIURL, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt)
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.omnigenApiURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.omnigenAPIURL, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -143,7 +143,7 @@ func (f *FALGenerator) GenerateFromAudio(ctx context.Context, url string) (strin
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.whisperApiURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.whisperAPIURL, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +167,7 @@ func (f *FALGenerator) postFALRequest(ctx context.Context, url string, payloadBu
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", "Key "+f.falApiKey)
+	req.Header.Add("Authorization", "Key "+f.falAPIKey)
 	req.Header.Add("Content-Type", "application/json")
 
 	client := &http.Client{}
