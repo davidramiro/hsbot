@@ -26,3 +26,4 @@ If there is no @, it's just the first name of the user. You can directly address
 api_key = "4242:1234"
 flux_url = "https://fal.run/fal-ai/flux-pro/v1.1"
 whisper_url = "https://fal.run/fal-ai/whisper"
+omnigen_url = "https://fal.run/fal-ai/omnigen-v1"

@@ -15,9 +15,12 @@ Copy `config.sample.toml` to `config.toml` and set your keys/options.
 
 - `/chat`: Keeping conversation context for a duration defined in the config, this handler uses Claude to generate
 chat responses. Also works with replying to images, using Claude's Vision component.
+- `/think`: Similar to `/chat`, but without conversation context and including extended thinking response.
 - `/image`: Generating images from a prompt, set to use Flux as default.
+- `/edit`: Edit images via prompt
 - `/scale`: Liquid rescale images with a power factor
 - `/transcribe`: Transcribe audio files and voice messages
+
 
 ## Development
 

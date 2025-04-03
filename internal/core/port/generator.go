@@ -16,4 +16,5 @@ type Transcriber interface {
 
 type ImageGenerator interface {
 	GenerateFromPrompt(ctx context.Context, prompt string) (string, error)
+	EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string, error)
 }
