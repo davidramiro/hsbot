@@ -22,6 +22,10 @@ func (m *MockImageGenerator) GenerateFromPrompt(_ context.Context, prompt string
 	return m.response, m.err
 }
 
+func (m *MockImageGenerator) EditFromPrompt(_ context.Context, prompt domain.Prompt) (string, error) {
+	return "", nil
+}
+
 type MockImageSender struct {
 	err     error
 	Message string

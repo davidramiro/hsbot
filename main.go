@@ -63,12 +63,15 @@ func main() {
 
 	claudeGenerator := generator.NewClaudeGenerator(viper.GetString("claude.api_key"),
 		viper.GetString("claude.system_prompt"))
-	fluxGenerator := generator.NewFALGenerator(viper.GetString("fal.flux_url"), viper.GetString("fal.api_key"))
 	magickConverter, err := converter.NewMagickConverter()
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
-	transcriber := generator.NewFALGenerator(viper.GetString("fal.whisper_url"), viper.GetString("fal.api_key"))
+	falGenerator := generator.NewFALGenerator(
+		viper.GetString("fal.flux_url"),
+		viper.GetString("fal.omnigen_url"),
+		viper.GetString("fal.whisper_url"),
+		viper.GetString("fal.api_key"))
 
 	convoTimeout, err := time.ParseDuration(viper.GetString("chat.context_timeout"))
 	if err != nil {
@@ -76,11 +79,12 @@ func main() {
 	}
 
 	commandRegistry := &domain.CommandRegistry{}
-	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, transcriber, "/chat", convoTimeout))
-	commandRegistry.Register(commands.NewImageHandler(fluxGenerator, s, s, "/image"))
-	commandRegistry.Register(commands.NewThinkHandler(claudeGenerator, s, transcriber, "/think"))
+	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, falGenerator, "/chat", convoTimeout))
+	commandRegistry.Register(commands.NewImageHandler(falGenerator, s, s, "/image"))
+	commandRegistry.Register(commands.NewThinkHandler(claudeGenerator, s, falGenerator, "/think"))
+	commandRegistry.Register(commands.NewEditHandler(falGenerator, s, s, "/edit"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
-	commandRegistry.Register(commands.NewTranscribeHandler(transcriber, s, "/transcribe"))
+	commandRegistry.Register(commands.NewTranscribeHandler(falGenerator, s, "/transcribe"))
 
 	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
 	if err != nil {

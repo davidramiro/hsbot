@@ -10,28 +10,28 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ImageHandler struct {
+type EditHandler struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
 	command        string
 }
 
-func NewImageHandler(imageGenerator port.ImageGenerator,
+func NewEditHandler(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	command string) *ImageHandler {
-	return &ImageHandler{imageGenerator: imageGenerator,
+	command string) *EditHandler {
+	return &EditHandler{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
 		command:     command}
 }
 
-func (h *ImageHandler) GetCommand() string {
+func (h *EditHandler) GetCommand() string {
 	return h.command
 }
 
-func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+func (h *EditHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -56,7 +56,16 @@ func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, messa
 		return nil
 	}
 
-	imageURL, err := h.imageGenerator.GenerateFromPrompt(ctx, prompt)
+	if message.ImageURL == "" {
+		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "missing image")
+		if err != nil {
+			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
+			return err
+		}
+		return nil
+	}
+
+	imageURL, err := h.imageGenerator.EditFromPrompt(ctx, domain.Prompt{Prompt: prompt, ImageURL: message.ImageURL})
 	if err != nil {
 		errMsg := "error getting FAL response"
 		l.Error().Err(err).Str("imageURL", imageURL).Msg(errMsg)
