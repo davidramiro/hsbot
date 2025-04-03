@@ -7,7 +7,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/liushuangls/go-anthropic/v2 v2.14.1
 	github.com/rs/zerolog v1.34.0
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 )
 
