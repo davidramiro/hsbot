@@ -6,7 +6,7 @@ import (
 )
 
 type TextGenerator interface {
-	GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (string, error)
+	GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (domain.ModelResponse, error)
 }
 
 type Transcriber interface {

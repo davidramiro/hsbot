@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/revrost/go-openrouter"
-	"github.com/spf13/viper"
 	"hsbot/internal/core/domain"
 )
 
@@ -23,7 +22,8 @@ func NewOpenRouterGenerator(apiKey, systemPrompt string) *OpenRouterGenerator {
 	}
 }
 
-func (c *OpenRouterGenerator) GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (string, error) {
+func (c *OpenRouterGenerator) GenerateFromPrompt(
+	ctx context.Context, prompts []domain.Prompt) (domain.ModelResponse, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(prompts)+1)
 
 	messages[0] = openrouter.ChatCompletionMessage{
@@ -54,24 +54,17 @@ func (c *OpenRouterGenerator) GenerateFromPrompt(ctx context.Context, prompts []
 
 	resp, err := c.client.CreateChatCompletion(ctx, ccr)
 	if err != nil {
-		return "", fmt.Errorf("openrouter API error: %w", err)
+		return domain.ModelResponse{}, fmt.Errorf("openrouter API error: %w", err)
 	}
 
-	if viper.GetBool("bot.debug_replies") {
-		return fmt.Sprintf(`%s
-
---
-debug info: model: %s
-c tokens: %d | total tokens: %d,
-convo size: %d`,
-			resp.Choices[0].Message.Content.Text,
-			resp.Model,
-			resp.Usage.PromptTokens,
-			resp.Usage.TotalTokens,
-			len(prompts)), nil
-	}
-
-	return resp.Choices[0].Message.Content.Text, nil
+	return domain.ModelResponse{
+		Response: resp.Choices[0].Message.Content.Text,
+		Metadata: domain.ResponseMetadata{
+			Model:            resp.Model,
+			CompletionTokens: resp.Usage.CompletionTokens,
+			TotalTokens:      resp.Usage.TotalTokens,
+		},
+	}, nil
 }
 
 func createUserMessage(prompt domain.Prompt) openrouter.ChatCompletionMessage {

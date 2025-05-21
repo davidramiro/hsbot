@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/spf13/viper"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
 	"sync"
@@ -137,12 +138,30 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	}
 
 	l.Debug().Msg("reply generated")
-	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response})
+	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response.Response})
+
+	var responseToSend string
+
+	if viper.GetBool("bot.debug_replies") {
+		responseToSend = fmt.Sprintf(`%s
+
+--
+debug: model: %s
+c tokens: %d | total tokens: %d
+convo size: %d`,
+			response.Response,
+			response.Metadata.Model,
+			response.Metadata.CompletionTokens,
+			response.Metadata.TotalTokens,
+			len(conversation.messages))
+	} else {
+		responseToSend = response.Response
+	}
 
 	_, err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
 		message.ID,
-		response)
+		responseToSend)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		return err

@@ -64,3 +64,14 @@ func FindModelByMessage(message *string) Model {
 
 	return ModelClaude
 }
+
+type ModelResponse struct {
+	Response string
+	Metadata ResponseMetadata
+}
+
+type ResponseMetadata struct {
+	Model            string
+	CompletionTokens int
+	TotalTokens      int
+}
