@@ -59,7 +59,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
-	promptText, err := h.extractPrompt(ctx, message)
+	promptText, model, err := h.extractPrompt(ctx, message)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to extract prompt text")
 	}
@@ -102,15 +102,21 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	if message.QuotedText != "" && message.ImageURL == "" {
 		// if there's a user message being replied to, add the previous message to the context
 		if !message.IsReplyToBot {
-			conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
+			conversation.messages = append(conversation.messages, domain.Prompt{
+				Author: domain.User,
+				Model:  model,
 				Prompt: message.ReplyToUsername + ": " + message.QuotedText})
 		}
 
-		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
+		conversation.messages = append(conversation.messages, domain.Prompt{
+			Author: domain.User,
 			Prompt: promptText})
 	} else {
-		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.User,
-			Prompt: promptText, ImageURL: message.ImageURL})
+		conversation.messages = append(conversation.messages, domain.Prompt{
+			Author:   domain.User,
+			Model:    model,
+			Prompt:   promptText,
+			ImageURL: message.ImageURL})
 	}
 
 	response, err := h.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
@@ -145,7 +151,7 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	return nil
 }
 
-func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, error) {
+func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -157,23 +163,24 @@ func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message
 		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return "", err
+			return "", domain.Model{}, err
 		}
-		return "", nil
+		return "", domain.Model{}, nil
 	}
+	model := domain.FindModelByMessage(&promptText)
 
 	if message.AudioURL != "" {
 		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
 		if err != nil {
 			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return "", err
+			return "", domain.Model{}, err
 		}
 
 		promptText += ": " + transcript
 	}
 
 	promptText = message.Username + ": " + promptText
-	return promptText, nil
+	return promptText, model, nil
 }
 
 func (h *ChatHandler) startConversationTimer(convo *Conversation) {

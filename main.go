@@ -61,8 +61,9 @@ func main() {
 
 	s := sender.NewTelegramSender(b)
 
-	claudeGenerator := generator.NewClaudeGenerator(viper.GetString("claude.api_key"),
-		viper.GetString("claude.system_prompt"))
+	orGenerator := generator.NewOpenRouterGenerator(viper.GetString("openrouter.api_key"),
+		viper.GetString("chat.system_prompt"))
+
 	magickConverter, err := converter.NewMagickConverter()
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
@@ -79,9 +80,8 @@ func main() {
 	}
 
 	commandRegistry := &domain.CommandRegistry{}
-	commandRegistry.Register(commands.NewChatHandler(claudeGenerator, s, falGenerator, "/chat", convoTimeout))
+	commandRegistry.Register(commands.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout))
 	commandRegistry.Register(commands.NewImageHandler(falGenerator, s, s, "/image"))
-	commandRegistry.Register(commands.NewThinkHandler(claudeGenerator, s, falGenerator, "/think"))
 	commandRegistry.Register(commands.NewEditHandler(falGenerator, s, s, "/edit"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
 	commandRegistry.Register(commands.NewTranscribeHandler(falGenerator, s, "/transcribe"))

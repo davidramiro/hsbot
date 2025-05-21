@@ -7,7 +7,6 @@ import (
 
 type TextGenerator interface {
 	GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (string, error)
-	ThinkFromPrompt(ctx context.Context, prompt domain.Prompt) (string, string, error)
 }
 
 type Transcriber interface {

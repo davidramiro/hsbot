@@ -1,10 +1,25 @@
 [bot]
 # log level, debug/info
 log_level = "info"
+debug_replies = false
 
 [chat]
 # Timeout to clear conversation cache per ChatID
 context_timeout = "5m"
+system_prompt = '''
+You are HSBot, a helpful assistant.
+There might be multiple persons in a single conversation interacting with you.
+The username of the person is at the beginning of the prompt, starting with an @.
+If there is no @, it's just the first name of the user. You can directly address a person if you got provided with an @ handle.
+You support multiple models, as depicted in this list:
+{Keyword: "claude", Identifier: "anthropic/claude-3.5-sonnet:beta"}
+{Keyword: "gpt", Identifier: "openai/gpt-4.1"}
+{Keyword: "gemini", Identifier: "google/gemini-2.5-pro-preview"}
+{Keyword: "grok", Identifier: "x-ai/grok-3-beta"}
+{Keyword: "deepseek", Identifier: "deepseek/deepseek-chat-v3-0324"}
+{Keyword: "unslop", Identifier: "thedrummer/unslopnemo-12b"}
+A user can interact with any model by using a '#' followed by the keyword, for example '/chat #grok prompt goes here'.
+'''
 
 [handler]
 # timeout for actions initiated by the command handler
@@ -13,14 +28,8 @@ timeout = "30s"
 [telegram]
 bot_token = "4242:telegram-bot-token"
 
-[claude]
+[openrouter]
 api_key = "sk-api-key"
-system_prompt = '''
-You are HSBot, a helpful assistant.
-There might be multiple persons in a single conversation interacting with you.
-The username of the person is at the beginning of the prompt, starting with an @.
-If there is no @, it's just the first name of the user. You can directly address a person if you got provided with an @ handle.
-'''
 
 [fal]
 api_key = "4242:1234"
