@@ -102,7 +102,7 @@ func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, ur
 		return
 	}
 
-	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: findLargestImage(photos)})
+	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: findMediumSizedImage(photos)})
 	if err != nil {
 		log.Error().Msg("error getting file from telegram api")
 		url <- ""
@@ -143,17 +143,17 @@ func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, ur
 	url <- b.FileDownloadLink(f)
 }
 
-func findLargestImage(photos []models.PhotoSize) string {
-	maxSize := -1
-	var maxID string
+const minSize = 80000
+const maxSize = 130000
+
+func findMediumSizedImage(photos []models.PhotoSize) string {
 	for _, photo := range photos {
-		if photo.FileSize > maxSize {
-			maxSize = photo.FileSize
-			maxID = photo.FileID
+		if photo.FileSize > minSize && photo.FileSize < maxSize {
+			return photo.FileID
 		}
 	}
 
-	return maxID
+	return photos[len(photos)-1].FileID
 }
 
 func getUserNameFromMessage(user *models.User) string {

@@ -57,7 +57,7 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	var power float64
 	var err error
 	if args == "" {
-		power = 80
+		power = 50
 	} else {
 		power, err = strconv.ParseFloat(args, 32)
 		if err != nil {
