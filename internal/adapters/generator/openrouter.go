@@ -3,8 +3,9 @@ package generator
 import (
 	"context"
 	"fmt"
-	"github.com/revrost/go-openrouter"
 	"hsbot/internal/core/domain"
+
+	"github.com/revrost/go-openrouter"
 )
 
 type OpenRouterGenerator struct {

@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/spf13/viper"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/rs/zerolog/log"
 )
@@ -20,6 +22,8 @@ type ChatHandler struct {
 	cacheDuration time.Duration
 	command       string
 	cache         sync.Map
+	models        []domain.Model
+	defaultModel  domain.Model
 }
 
 type Conversation struct {
@@ -30,16 +34,32 @@ type Conversation struct {
 }
 
 func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
-	command string, cacheDuration time.Duration) *ChatHandler {
+	command string, cacheDuration time.Duration) (*ChatHandler, error) {
+	var models []domain.Model
+	err := viper.UnmarshalKey("openrouter.models", &models)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to unmarshal openrouter models from config")
+		return nil, err
+	}
+
+	var model domain.Model
+	err = viper.UnmarshalKey("openrouter.default_model", &model)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to unmarshal openrouter default model from config")
+		return nil, err
+	}
+
 	h := &ChatHandler{
 		textGenerator: textGenerator,
 		textSender:    textSender,
 		transcriber:   transcriber,
 		cacheDuration: cacheDuration,
 		command:       command,
+		models:        models,
+		defaultModel:  model,
 	}
 
-	return h
+	return h, nil
 }
 
 func (h *ChatHandler) GetCommand() string {
@@ -140,34 +160,34 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	l.Debug().Msg("reply generated")
 	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response.Response})
 
-	var responseToSend string
-
 	if viper.GetBool("bot.debug_replies") {
-		responseToSend = fmt.Sprintf(`%s
-
---
-debug: model: %s
-c tokens: %d | total tokens: %d
-convo size: %d`,
-			response.Response,
-			response.Metadata.Model,
-			response.Metadata.CompletionTokens,
-			response.Metadata.TotalTokens,
-			len(conversation.messages))
-	} else {
-		responseToSend = response.Response
+		addDebugInfo(&response.Response, response.Metadata, len(conversation.messages))
 	}
 
 	_, err = h.textSender.SendMessageReply(ctx,
 		message.ChatID,
 		message.ID,
-		responseToSend)
+		response.Response)
 	if err != nil {
 		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		return err
 	}
 
 	return nil
+}
+
+func addDebugInfo(response *string, metadata domain.ResponseMetadata, length int) {
+	*response = fmt.Sprintf(`%s
+
+--
+debug: model: %s
+c tokens: %d | total tokens: %d
+convo size: %d`,
+		response,
+		metadata.Model,
+		metadata.CompletionTokens,
+		metadata.TotalTokens,
+		length)
 }
 
 func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
@@ -186,7 +206,7 @@ func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message
 		}
 		return "", domain.Model{}, nil
 	}
-	model := domain.FindModelByMessage(&promptText)
+	model := h.findModelByMessage(&promptText)
 
 	if message.AudioURL != "" {
 		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
@@ -216,4 +236,15 @@ func (h *ChatHandler) startConversationTimer(convo *Conversation) {
 			return
 		}
 	}
+}
+
+func (h *ChatHandler) findModelByMessage(message *string) domain.Model {
+	for _, model := range h.models {
+		if strings.Contains(strings.ToLower(*message), "#"+strings.ToLower(model.Keyword)) {
+			*message = strings.ReplaceAll(*message, "#"+strings.ToLower(model.Keyword), "")
+			return model
+		}
+	}
+
+	return h.defaultModel
 }

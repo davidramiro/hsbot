@@ -80,7 +80,14 @@ func main() {
 	}
 
 	commandRegistry := &domain.CommandRegistry{}
-	commandRegistry.Register(commands.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout))
+
+	chatHandler, err := commands.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed initializing chat handler")
+	}
+
+	commandRegistry.Register(chatHandler)
+	commandRegistry.Register(commands.NewModelHandler(chatHandler, s, "/models"))
 	commandRegistry.Register(commands.NewImageHandler(falGenerator, s, s, "/image"))
 	commandRegistry.Register(commands.NewEditHandler(falGenerator, s, s, "/edit"))
 	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))

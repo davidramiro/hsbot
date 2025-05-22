@@ -18,8 +18,8 @@ type MockTextGenerator struct {
 	Message         string
 }
 
-func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (string, error) {
-	return m.response, m.err
+func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (domain.ModelResponse, error) {
+	return domain.ModelResponse{Response: m.response}, m.err
 }
 
 func (m *MockTextGenerator) ThinkFromPrompt(_ context.Context, _ domain.Prompt) (string, string, error) {
@@ -43,7 +43,7 @@ func TestChatHandlerClearingCache(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -71,7 +71,7 @@ func TestChatHandlerCache(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -111,7 +111,7 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -158,7 +158,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -215,7 +215,7 @@ func TestGeneratorError(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -231,7 +231,7 @@ func TestEmptyPromptError(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -247,7 +247,7 @@ func TestSendMessageError(t *testing.T) {
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -263,7 +263,7 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
 
-	chatHandler := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)

@@ -11,14 +11,8 @@ You are HSBot, a helpful assistant.
 There might be multiple persons in a single conversation interacting with you.
 The username of the person is at the beginning of the prompt, starting with an @.
 If there is no @, it's just the first name of the user. You can directly address a person if you got provided with an @ handle.
-You support multiple models, as depicted in this list:
-{Keyword: "claude", Identifier: "anthropic/claude-3.5-sonnet:beta"}
-{Keyword: "gpt", Identifier: "openai/gpt-4.1"}
-{Keyword: "gemini", Identifier: "google/gemini-2.5-pro-preview"}
-{Keyword: "grok", Identifier: "x-ai/grok-3-beta"}
-{Keyword: "deepseek", Identifier: "deepseek/deepseek-chat-v3-0324"}
-{Keyword: "unslop", Identifier: "thedrummer/unslopnemo-12b"}
-A user can interact with any model by using a '#' followed by the keyword, for example '/chat #grok prompt goes here'.
+You support multiple models, for a list of available models, the user can type '/models'.
+A user can interact with any model by using a '#' followed by the keyword, for example '/chat #gpt prompt goes here'.
 '''
 
 [handler]
@@ -30,6 +24,15 @@ bot_token = "4242:telegram-bot-token"
 
 [openrouter]
 api_key = "sk-api-key"
+models = [
+    { keyword = "claude", identifier = "anthropic/claude-3.5-sonnet:beta"},
+    { keyword = "gpt", identifier = "openai/gpt-4.1"},
+    { keyword = "gemini", identifier = "google/gemini-2.5-pro-preview"},
+    { keyword = "grok", identifier = "x-ai/grok-3-beta"},
+    { keyword = "deepseek", identifier = "deepseek/deepseek-chat-v3-0324"},
+    { keyword = "unslop", identifier = "thedrummer/unslopnemo-12b"},
+]
+default_model = { keyword = "claude", identifier = "anthropic/claude-3.5-sonnet:beta"}
 
 [fal]
 api_key = "4242:1234"
