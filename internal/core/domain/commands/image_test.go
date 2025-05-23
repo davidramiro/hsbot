@@ -31,12 +31,12 @@ type MockImageSender struct {
 	Message string
 }
 
-func (m *MockImageSender) SendImageURLReply(_ context.Context, _ int64, _ int, url string) error {
+func (m *MockImageSender) SendImageURLReply(_ context.Context, _ *domain.Message, url string) error {
 	m.Message = url
 	return m.err
 }
 
-func (m *MockImageSender) SendImageFileReply(_ context.Context, _ int64, _ int, file []byte) error {
+func (m *MockImageSender) SendImageFileReply(_ context.Context, _ *domain.Message, file []byte) error {
 	m.Message = string(file)
 	return m.err
 }
@@ -59,7 +59,7 @@ func TestImageRepondSuccessful(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
 	require.NoError(t, err)
 
@@ -73,9 +73,9 @@ func TestImageRepondSendFailed(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	require.Errorf(t, err, "mock error")
+	require.Equal(t, "error sending edited image: mock error", mt.Message)
 }
 
 func TestImageRepondErrorEmptyPrompt(t *testing.T) {
@@ -85,7 +85,7 @@ func TestImageRepondErrorEmptyPrompt(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
 	require.NoError(t, err)
 
@@ -99,11 +99,10 @@ func TestImageRepondErrorGenerating(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	require.NoError(t, err)
 
-	assert.Equal(t, "error getting FAL response: mock error", mt.Message)
+	require.Equal(t, "error generating image: mock error", mt.Message)
 }
 
 func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
@@ -113,11 +112,10 @@ func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	require.Errorf(t, err, "mock error")
 
-	assert.Equal(t, "error getting FAL response: mock error", mt.Message)
+	require.EqualError(t, mt.err, "mock error")
 }
 
 func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
@@ -127,9 +125,8 @@ func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
 
 	imageHandler := NewImageHandler(mg, mi, mt, "/image")
 
-	err := imageHandler.Respond(context.Background(), time.Minute,
+	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
-	require.Errorf(t, err, "mock error")
 
-	assert.Equal(t, "missing image prompt", mt.Message)
+	require.EqualError(t, mt.err, "mock error")
 }

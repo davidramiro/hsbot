@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
@@ -40,39 +41,19 @@ func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, 
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
 	if message.AudioURL == "" {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "reply to an audio")
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
-
+		_ = h.textSender.NotifyAndReturnError(ctx, errors.New("reply to an audio"), message)
 		return nil
 	}
 
 	resp, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
 	if err != nil {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, fmt.Sprintf("transcription failed: %s", err))
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-
-			return err
-		}
-
-		return nil
+		return h.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to generate audio: %w", err), message)
 	}
 
-	var replyToID int
-	if message.ReplyToMessageID != nil {
-		replyToID = *message.ReplyToMessageID
-	} else {
-		replyToID = message.ID
-	}
-
-	_, err = h.textSender.SendMessageReply(ctx, message.ChatID, replyToID, resp)
+	_, err = h.textSender.SendMessageReply(ctx, message, resp)
 	if err != nil {
-		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-
-		return err
+		err = fmt.Errorf("error sending transcript: %w", err)
+		return h.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
 	return nil

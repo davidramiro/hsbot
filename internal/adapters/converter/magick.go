@@ -24,6 +24,7 @@ func NewMagickConverter() (*MagickConverter, error) {
 	commands := [][]string{{"magick", "convert", "-version"}, {"convert", "-version"}}
 
 	for _, command := range commands {
+		// #nosec G204: no user input
 		_, err := exec.Command(command[0], command[1:]...).Output()
 		if err != nil {
 			log.Debug().Strs("commands", command).Msg("binary not found")
@@ -66,6 +67,7 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 		Str("path", path).
 		Msg("scaling image")
 
+	// #nosec G204: only a float as user input
 	cmd := exec.Command(command[0], command[1:]...)
 	out, err := cmd.Output()
 	if err != nil {

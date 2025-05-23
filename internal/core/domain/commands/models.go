@@ -50,7 +50,7 @@ func (m *ModelHandler) Respond(ctx context.Context, _ time.Duration, message *do
 		return fmt.Errorf("failed to construct response: %w", err)
 	}
 
-	_, err = m.ts.SendMessageReply(ctx, message.ChatID, message.ID, sb.String())
+	_, err = m.ts.SendMessageReply(ctx, message, sb.String())
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}

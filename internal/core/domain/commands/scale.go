@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
@@ -42,13 +43,8 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 
 	go h.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
 
-	if message.ImageURL == "" || message.ReplyToMessageID == nil {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
-			"reply to an image")
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
+	if message.ImageURL == "" {
+		_ = h.textSender.NotifyAndReturnError(ctx, errors.New("missing image"), message)
 		return nil
 	}
 
@@ -61,31 +57,19 @@ func (h *ScaleHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	} else {
 		power, err = strconv.ParseFloat(args, 32)
 		if err != nil {
-			_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
-				"usage: /scale or /scale <power>, 1-100")
-			if err != nil {
-				l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-				return err
-			}
+			_ = h.textSender.NotifyAndReturnError(ctx, errors.New("usage: /scale or /scale <power>, 1-100"), message)
 			return nil
 		}
 	}
 
 	rescaled, err := h.imageConverter.Scale(ctx, message.ImageURL, float32(power))
 	if err != nil {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID,
-			fmt.Sprintf("failed to scale image: %s", err))
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
-		return nil
+		return h.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to scale image: %w", err), message)
 	}
 
-	err = h.imageSender.SendImageFileReply(ctx, message.ChatID, *message.ReplyToMessageID, rescaled)
+	err = h.imageSender.SendImageFileReply(ctx, message, rescaled)
 	if err != nil {
-		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-		return err
+		return h.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed send scaled image: %w", err), message)
 	}
 
 	return nil

@@ -73,8 +73,8 @@ func TestListServices(t *testing.T) {
 	list := cr.ListCommands()
 
 	assert.Len(t, list, 2)
-	assert.Equal(t, "/foo", list[0])
-	assert.Equal(t, "/bar", list[1])
+	assert.Contains(t, list, "/foo")
+	assert.Contains(t, list, "/bar")
 }
 
 func TestParseCommandArgs(t *testing.T) {

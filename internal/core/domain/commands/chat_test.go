@@ -31,9 +31,17 @@ type MockTextSender struct {
 	Message string
 }
 
-func (m *MockTextSender) SendMessageReply(_ context.Context, _ int64, _ int, message string) (int, error) {
+func (m *MockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, message string) (int, error) {
 	m.Message = message
 	return 0, m.err
+}
+
+func (m *MockTextSender) NotifyAndReturnError(_ context.Context, err error, _ *domain.Message) error {
+	m.Message = err.Error()
+	if m.err != nil {
+		return m.err
+	}
+	return err
 }
 
 func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {}
@@ -48,7 +56,7 @@ func TestChatHandlerClearingCache(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
@@ -76,7 +84,7 @@ func TestChatHandlerCache(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt"})
 
 	require.NoError(t, err)
@@ -89,7 +97,7 @@ func TestChatHandlerCache(t *testing.T) {
 	})
 	assert.Equal(t, 1, size)
 
-	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
 	require.NoError(t, err)
 
@@ -116,13 +124,13 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt chat id 1"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
 
-	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 2, ID: 2, Username: "@unit", Text: "/chat prompt chat id 2"})
 	require.NoError(t, err)
 
@@ -163,7 +171,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt"})
 
 	require.NoError(t, err)
@@ -178,7 +186,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
 	require.NoError(t, err)
 
@@ -191,7 +199,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	err = chatHandler.Respond(context.Background(), time.Minute, &domain.Message{
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt3"})
 	require.NoError(t, err)
 
@@ -220,10 +228,10 @@ func TestGeneratorError(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
-	require.NoError(t, err)
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+	require.Error(t, err)
 
-	assert.Equal(t, "failed to generate reply: mock error", ms.Message)
+	assert.Equal(t, "failed to generate response: mock error", ms.Message)
 }
 
 func TestEmptyPromptError(t *testing.T) {
@@ -236,10 +244,10 @@ func TestEmptyPromptError(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat"})
-	require.NoError(t, err)
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat"})
+	require.Error(t, err)
 
-	assert.Equal(t, "please input a prompt", ms.Message)
+	assert.Equal(t, "failed to extract prompt: empty prompt", ms.Message)
 }
 
 func TestSendMessageError(t *testing.T) {
@@ -252,7 +260,7 @@ func TestSendMessageError(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 
 	assert.Equal(t, "mock response", ms.Message)
 	require.Errorf(t, err, "failed to send reply")
@@ -268,8 +276,8 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 
 	assert.NotNil(t, chatHandler)
 
-	err := chatHandler.Respond(context.Background(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 
-	assert.Equal(t, "failed to generate reply: mock error", ms.Message)
+	assert.Equal(t, "failed to generate response: mock error", ms.Message)
 	require.Errorf(t, err, "failed to send reply")
 }

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
@@ -48,33 +49,20 @@ func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, messa
 
 	prompt := domain.ParseCommandArgs(message.Text)
 	if prompt == "" {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "missing image prompt")
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
+		_ = h.textSender.NotifyAndReturnError(ctx, errors.New("missing image prompt"), message)
 		return nil
 	}
 
 	imageURL, err := h.imageGenerator.GenerateFromPrompt(ctx, prompt)
 	if err != nil {
-		errMsg := "error getting FAL response"
-		l.Error().Err(err).Str("imageURL", imageURL).Msg(errMsg)
-		_, err := h.textSender.SendMessageReply(ctx,
-			message.ChatID,
-			message.ID,
-			fmt.Sprintf("%s: %s", errMsg, err))
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
-		return nil
+		err = fmt.Errorf("error generating image: %w", err)
+		return h.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	err = h.imageSender.SendImageURLReply(ctx, message.ChatID, message.ID, imageURL)
+	err = h.imageSender.SendImageURLReply(ctx, message, imageURL)
 	if err != nil {
-		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-		return err
+		err = fmt.Errorf("error sending edited image: %w", err)
+		return h.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
 	return nil

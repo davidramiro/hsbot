@@ -1,6 +1,8 @@
 package domain
 
-const (
-	ErrSendingReplyFailed = "failed to send reply"
-	ErrEmptyPrompt        = "empty prompt"
+import "errors"
+
+var (
+	ErrSendingReplyFailed = errors.New("failed to send reply")
+	ErrEmptyPrompt        = errors.New("empty prompt")
 )

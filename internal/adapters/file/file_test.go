@@ -1,7 +1,6 @@
 package file
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,7 +20,7 @@ func TestDownloadFile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := DownloadFile(context.Background(), srv.URL)
+	res, err := DownloadFile(t.Context(), srv.URL)
 	require.NoError(t, err)
 
 	assert.Equal(t, want, res)
@@ -36,7 +35,7 @@ func TestSaveTemp(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := DownloadFile(context.Background(), srv.URL)
+	res, err := DownloadFile(t.Context(), srv.URL)
 	require.NoError(t, err)
 
 	path, err := SaveTempFile(res, "txt")
@@ -59,7 +58,7 @@ func TestGetTemp(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := DownloadFile(context.Background(), srv.URL)
+	res, err := DownloadFile(t.Context(), srv.URL)
 	require.NoError(t, err)
 
 	path, err := SaveTempFile(res, "txt")

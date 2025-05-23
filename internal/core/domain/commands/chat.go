@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/spf13/viper"
 
 	"github.com/rs/zerolog/log"
@@ -24,6 +26,7 @@ type ChatHandler struct {
 	cache         sync.Map
 	models        []domain.Model
 	defaultModel  domain.Model
+	l             *zerolog.Logger
 }
 
 type Conversation struct {
@@ -49,6 +52,11 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 		return nil, err
 	}
 
+	logger := log.With().
+		Str("command", command).
+		Str("handler", "chat").
+		Logger()
+
 	h := &ChatHandler{
 		textGenerator: textGenerator,
 		textSender:    textSender,
@@ -57,20 +65,21 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 		command:       command,
 		models:        models,
 		defaultModel:  model,
+		l:             &logger,
 	}
 
 	return h, nil
 }
 
-func (h *ChatHandler) GetCommand() string {
-	return h.command
+func (c *ChatHandler) GetCommand() string {
+	return c.command
 }
 
-func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
-	l := log.With().
+func (c *ChatHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+	l := c.l.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
-		Str("command", h.GetCommand()).
+		Str("func", "Respond").
 		Logger()
 
 	l.Info().Msg("handling request")
@@ -78,47 +87,31 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	go h.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
+	go c.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
-	promptText, model, err := h.extractPrompt(ctx, message)
+	promptText, model, err := c.extractPrompt(ctx, message)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to extract prompt text")
+		err := c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to extract prompt: %w", err),
+			message)
+		return err
 	}
 
 	if promptText == "" {
-		log.Debug().Msg(domain.ErrEmptyPrompt)
-		return nil
+		if err := c.textSender.NotifyAndReturnError(ctx, domain.ErrEmptyPrompt, message); err != nil {
+			return err
+		}
 	}
 
-	var conversation *Conversation
-	c, ok := h.cache.Load(message.ChatID)
-	if !ok {
-		l.Debug().Msg("new conversation")
-
-		h.cache.Store(message.ChatID, &Conversation{
-			chatID:     message.ChatID,
-			exitSignal: make(chan struct{}),
-		})
-		c, _ = h.cache.Load(message.ChatID)
-		conversation, ok = c.(*Conversation)
-		if !ok {
-			err := errors.New("conversation type error")
-			l.Error().Err(err).Send()
+	conversation, err := c.getConversationForMessage(message)
+	if err != nil {
+		if err := c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to get conversation: %w", err),
+			message); err != nil {
 			return err
 		}
-	} else {
-		conversation, ok = c.(*Conversation)
-		if !ok {
-			err := errors.New("conversation type error")
-			l.Error().Err(err).Send()
-			return err
-		}
-		l.Debug().Msg("existing conversation, stopping timer")
-		conversation.exitSignal <- struct{}{}
 	}
 
 	conversation.timestamp = time.Now()
-	go h.startConversationTimer(conversation)
+	go c.startConversationTimer(conversation)
 
 	if message.QuotedText != "" && message.ImageURL == "" {
 		// if there's a user message being replied to, add the previous message to the context
@@ -140,40 +133,61 @@ func (h *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 			ImageURL: message.ImageURL})
 	}
 
-	response, err := h.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
+	response, err := c.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
 	if err != nil {
-		l.Error().Err(err).Msg("failed to generate prompt")
+		err := fmt.Errorf("failed to generate response: %w", err)
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
-
-		_, err = h.textSender.SendMessageReply(ctx,
-			message.ChatID,
-			message.ID,
-			fmt.Sprintf("failed to generate reply: %s", err))
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return err
-		}
-
-		return nil
+		return c.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
 	l.Debug().Msg("reply generated")
-	conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: response.Response})
+	conversation.messages = append(conversation.messages,
+		domain.Prompt{Author: domain.System, Prompt: response.Response})
 
 	if viper.GetBool("bot.debug_replies") {
 		addDebugInfo(&response.Response, response.Metadata, len(conversation.messages))
 	}
 
-	_, err = h.textSender.SendMessageReply(ctx,
-		message.ChatID,
-		message.ID,
+	_, err = c.textSender.SendMessageReply(ctx,
+		message,
 		response.Response)
 	if err != nil {
-		l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
 		return err
 	}
 
 	return nil
+}
+
+func (c *ChatHandler) getConversationForMessage(message *domain.Message) (*Conversation, error) {
+	l := c.l.With().
+		Int("messageId", message.ID).
+		Int64("chatId", message.ChatID).
+		Str("func", "getConversationForMessage").
+		Logger()
+
+	var conversation *Conversation
+	conv, ok := c.cache.Load(message.ChatID)
+	if !ok {
+		l.Debug().Msg("new conversation")
+
+		c.cache.Store(message.ChatID, &Conversation{
+			chatID:     message.ChatID,
+			exitSignal: make(chan struct{}),
+		})
+		conv, _ = c.cache.Load(message.ChatID)
+		conversation, ok = conv.(*Conversation)
+		if !ok {
+			return nil, errors.New("conversation type error")
+		}
+	} else {
+		conversation, ok = conv.(*Conversation)
+		if !ok {
+			return nil, errors.New("conversation type error")
+		}
+		l.Debug().Msg("existing conversation, stopping timer")
+		conversation.exitSignal <- struct{}{}
+	}
+	return conversation, nil
 }
 
 func addDebugInfo(response *string, metadata domain.ResponseMetadata, length int) {
@@ -183,36 +197,25 @@ func addDebugInfo(response *string, metadata domain.ResponseMetadata, length int
 debug: model: %s
 c tokens: %d | total tokens: %d
 convo size: %d`,
-		response,
+		*response,
 		metadata.Model,
 		metadata.CompletionTokens,
 		metadata.TotalTokens,
 		length)
 }
 
-func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
-	l := log.With().
-		Int("messageId", message.ID).
-		Int64("chatId", message.ChatID).
-		Str("command", h.GetCommand()).
-		Logger()
-
+func (c *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
 	promptText := domain.ParseCommandArgs(message.Text)
 	if promptText == "" {
-		_, err := h.textSender.SendMessageReply(ctx, message.ChatID, message.ID, "please input a prompt")
-		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return "", domain.Model{}, err
-		}
-		return "", domain.Model{}, nil
+		return "", domain.Model{}, domain.ErrEmptyPrompt
 	}
-	model := h.findModelByMessage(&promptText)
+
+	model := c.findModelByMessage(&promptText)
 
 	if message.AudioURL != "" {
-		transcript, err := h.transcriber.GenerateFromAudio(ctx, message.AudioURL)
+		transcript, err := c.transcriber.GenerateFromAudio(ctx, message.AudioURL)
 		if err != nil {
-			l.Error().Err(err).Msg(domain.ErrSendingReplyFailed)
-			return "", domain.Model{}, err
+			return "", domain.Model{}, fmt.Errorf("failed to generate transcript: %w", err)
 		}
 
 		promptText += ": " + transcript
@@ -222,14 +225,14 @@ func (h *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message
 	return promptText, model, nil
 }
 
-func (h *ChatHandler) startConversationTimer(convo *Conversation) {
-	t := time.NewTimer(h.cacheDuration)
+func (c *ChatHandler) startConversationTimer(convo *Conversation) {
+	t := time.NewTimer(c.cacheDuration)
 
 	for {
 		select {
 		case <-t.C:
-			log.Debug().Int64("chatID", convo.chatID).Msg("clearing conversation")
-			h.cache.Delete(convo.chatID)
+			c.l.Debug().Int64("chatID", convo.chatID).Msg("clearing conversation")
+			c.cache.Delete(convo.chatID)
 			return
 		case <-convo.exitSignal:
 			t.Stop()
@@ -238,13 +241,13 @@ func (h *ChatHandler) startConversationTimer(convo *Conversation) {
 	}
 }
 
-func (h *ChatHandler) findModelByMessage(message *string) domain.Model {
-	for _, model := range h.models {
+func (c *ChatHandler) findModelByMessage(message *string) domain.Model {
+	for _, model := range c.models {
 		if strings.Contains(strings.ToLower(*message), "#"+strings.ToLower(model.Keyword)) {
 			*message = strings.ReplaceAll(*message, "#"+strings.ToLower(model.Keyword), "")
 			return model
 		}
 	}
 
-	return h.defaultModel
+	return c.defaultModel
 }

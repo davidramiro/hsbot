@@ -24,20 +24,19 @@ func NewTelegramSender(bot *bot.Bot) *TelegramSender {
 
 func (s *TelegramSender) SendMessageReply(
 	ctx context.Context,
-	chatID int64,
-	messageID int,
-	message string) (int, error) {
-	replies := (len(message) + TelegramMessageLimit - 1) / TelegramMessageLimit
+	message *domain.Message,
+	text string) (int, error) {
+	replies := (len(text) + TelegramMessageLimit - 1) / TelegramMessageLimit
 	lastSentID := -1
 
 	for i := range replies {
-		substr := message[i*TelegramMessageLimit : min(len(message), (i+1)*TelegramMessageLimit)]
+		substr := text[i*TelegramMessageLimit : min(len(text), (i+1)*TelegramMessageLimit)]
 		sent, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: chatID,
+			ChatID: message.ChatID,
 			Text:   substr,
 			ReplyParameters: &models.ReplyParameters{
-				MessageID: messageID,
-				ChatID:    chatID,
+				MessageID: message.ID,
+				ChatID:    message.ChatID,
 			},
 		})
 		if err != nil {
@@ -51,12 +50,12 @@ func (s *TelegramSender) SendMessageReply(
 	return lastSentID, nil
 }
 
-func (s *TelegramSender) SendImageURLReply(ctx context.Context, chatID int64, messageID int, url string) error {
+func (s *TelegramSender) SendImageURLReply(ctx context.Context, message *domain.Message, url string) error {
 	params := &bot.SendPhotoParams{
-		ChatID: chatID,
+		ChatID: message.ChatID,
 		ReplyParameters: &models.ReplyParameters{
-			MessageID: messageID,
-			ChatID:    chatID,
+			MessageID: message.ID,
+			ChatID:    message.ChatID,
 		},
 		Photo: &models.InputFileString{Data: url},
 	}
@@ -70,14 +69,14 @@ func (s *TelegramSender) SendImageURLReply(ctx context.Context, chatID int64, me
 	return nil
 }
 
-func (s *TelegramSender) SendImageFileReply(ctx context.Context, chatID int64, messageID int, file []byte) error {
+func (s *TelegramSender) SendImageFileReply(ctx context.Context, message *domain.Message, file []byte) error {
 	params := &bot.SendPhotoParams{
-		ChatID: chatID,
-		Photo: &models.InputFileUpload{Filename: fmt.Sprintf("%d.png", messageID),
+		ChatID: message.ChatID,
+		Photo: &models.InputFileUpload{Filename: fmt.Sprintf("%d.png", message.ID),
 			Data: bytes.NewReader(file)},
 		ReplyParameters: &models.ReplyParameters{
-			MessageID: messageID,
-			ChatID:    chatID,
+			MessageID: message.ID,
+			ChatID:    message.ChatID,
 		},
 	}
 
@@ -126,4 +125,14 @@ func (s *TelegramSender) SendChatAction(ctx context.Context, chatID int64, actio
 
 		time.Sleep(ChatActionRepeatSeconds * time.Second)
 	}
+}
+
+func (s *TelegramSender) NotifyAndReturnError(ctx context.Context, err error, message *domain.Message) error {
+	_, err2 := s.SendMessageReply(ctx,
+		message,
+		fmt.Sprintf("error: %s", err))
+	if err != nil {
+		return fmt.Errorf("failed sending error message: %w: %w", err, err2)
+	}
+	return err
 }

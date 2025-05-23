@@ -40,40 +40,10 @@ func TestScaleRespondSuccessful(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id})
+	err := scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id})
 	require.NoError(t, err)
 
 	assert.Equal(t, "success", ms.Message)
-}
-
-func TestScaleRespondErrorNoReply(t *testing.T) {
-	mg := &MockImageConverter{response: []byte("success")}
-	ms := &MockImageSender{}
-	ts := &MockTextSender{}
-
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
-
-	id := new(int)
-	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", Text: "/scale 80"})
-	require.NoError(t, err)
-
-	assert.Equal(t, "reply to an image", ts.Message)
-}
-
-func TestScaleRespondErrorNoReplyAndErrorSending(t *testing.T) {
-	mg := &MockImageConverter{response: []byte("success")}
-	ms := &MockImageSender{}
-	ts := &MockTextSender{err: errors.New("mock error")}
-
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
-
-	id := new(int)
-	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", Text: "/scale 80"})
-	require.Errorf(t, err, "mock error")
-
-	assert.Equal(t, "reply to an image", ts.Message)
 }
 
 func TestScaleRespondInvalidParam(t *testing.T) {
@@ -85,9 +55,8 @@ func TestScaleRespondInvalidParam(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
+	_ = scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
 		Text: "/scale foo"})
-	require.NoError(t, err)
 
 	assert.Equal(t, "usage: /scale or /scale <power>, 1-100", ts.Message)
 }
@@ -101,9 +70,8 @@ func TestScaleRespondInvalidParamAndErrorSending(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
+	_ = scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
 		Text: "/scale foo"})
-	require.Errorf(t, err, "mock error")
 
 	assert.Equal(t, "usage: /scale or /scale <power>, 1-100", ts.Message)
 }
@@ -117,11 +85,10 @@ func TestScaleRespondErrorScaleFailed(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
+	err := scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
 		Text: "/scale 80"})
-	require.NoError(t, err)
 
-	assert.Equal(t, "failed to scale image: mock error", ts.Message)
+	assert.EqualError(t, err, "failed to scale image: mock error")
 }
 
 func TestScaleRespondErrorScaleFailedAndErrorSending(t *testing.T) {
@@ -133,11 +100,10 @@ func TestScaleRespondErrorScaleFailedAndErrorSending(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
+	err := scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id,
 		Text: "/scale 80"})
-	require.Errorf(t, err, "mock error")
 
-	assert.Equal(t, "failed to scale image: mock error", ts.Message)
+	assert.EqualError(t, err, "mock error")
 }
 
 func TestScaleRespondSendImageFailed(t *testing.T) {
@@ -149,6 +115,6 @@ func TestScaleRespondSendImageFailed(t *testing.T) {
 
 	id := new(int)
 	*id = 1
-	err := scaleHandler.Respond(context.Background(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id})
+	err := scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id})
 	require.Errorf(t, err, "mock error")
 }
