@@ -124,6 +124,7 @@ func (c *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 
 		conversation.messages = append(conversation.messages, domain.Prompt{
 			Author: domain.User,
+			Model:  model,
 			Prompt: promptText})
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{
