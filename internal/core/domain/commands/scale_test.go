@@ -43,7 +43,22 @@ func TestScaleRespondSuccessful(t *testing.T) {
 	err := scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ImageURL: "foo", ReplyToMessageID: id})
 	require.NoError(t, err)
 
-	assert.Equal(t, "success", ms.Message)
+	assert.Equal(t, "success", ms.calledURL)
+}
+
+func TestScaleRespondMissingImage(t *testing.T) {
+	mg := &MockImageConverter{response: []byte("success")}
+	ms := &MockImageSender{}
+	ts := &MockTextSender{}
+
+	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+
+	id := new(int)
+	*id = 1
+	_ = scaleHandler.Respond(t.Context(), time.Minute, &domain.Message{ReplyToMessageID: id,
+		Text: "/scale 12"})
+
+	assert.Equal(t, "missing image", ts.Message)
 }
 
 func TestScaleRespondInvalidParam(t *testing.T) {

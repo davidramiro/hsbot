@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +21,14 @@ type MockTextGenerator struct {
 }
 
 func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (domain.ModelResponse, error) {
-	return domain.ModelResponse{Response: m.response}, m.err
+	return domain.ModelResponse{
+		Response: m.response,
+		Metadata: domain.ResponseMetadata{
+			Model:            "unit-test",
+			CompletionTokens: 24,
+			TotalTokens:      42,
+		},
+	}, m.err
 }
 
 func (m *MockTextGenerator) ThinkFromPrompt(_ context.Context, _ domain.Prompt) (string, string, error) {
@@ -46,10 +55,108 @@ func (m *MockTextSender) NotifyAndReturnError(_ context.Context, err error, _ *d
 
 func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {}
 
+func TestChatHandlerSimpleSuccess(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "mock response", ms.Message)
+}
+
+func TestChatHandlerTranscribeSuccess(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat transcribe", AudioURL: "foo"})
+
+	c, ok := chatHandler.cache.Load(int64(1))
+	require.True(t, ok)
+
+	conversation, ok := c.(*Conversation)
+	require.True(t, ok)
+	assert.Len(t, conversation.messages, 2)
+
+	assert.Equal(t, "@unit: transcribe: foo", conversation.messages[0].Prompt)
+	assert.Equal(t, "mock response", conversation.messages[1].Prompt)
+
+	require.NoError(t, err)
+	assert.Equal(t, "mock response", ms.Message)
+}
+
+func TestChatHandlerTranscribeError(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{err: errors.New("foo")}
+
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat transcribe", AudioURL: "bar"})
+
+	require.Errorf(t, err, "foo")
+	assert.Equal(t, "failed to extract prompt: failed to generate transcript: foo", ms.Message)
+}
+
+func TestChatHandlerErrorEmptyPrompt(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat"})
+
+	require.Errorf(t, err, "foo")
+	assert.Equal(t, "failed to extract prompt: empty prompt", ms.Message)
+}
+
+func TestChatHandlerDebugMessage(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+
+	viper.SetDefault("bot.debug_replies", true)
+
+	chatHandler, _ := NewChatHandler(mg, ms, mt,
+		"/chat", time.Second*3)
+
+	assert.NotNil(t, chatHandler)
+
+	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "mock response\n\n--\ndebug: model: unit-test\nc tokens: 24 | total tokens: 42\n"+
+		"convo size: 2", ms.Message)
+}
+
 func TestChatHandlerClearingCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+
+	viper.SetDefault("bot.debug_replies", false)
 
 	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
@@ -78,6 +185,8 @@ func TestChatHandlerCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+
+	viper.SetDefault("bot.debug_replies", false)
 
 	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
@@ -118,6 +227,8 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+
+	viper.SetDefault("bot.debug_replies", false)
 
 	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
@@ -165,6 +276,8 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+
+	viper.SetDefault("bot.debug_replies", false)
 
 	chatHandler, _ := NewChatHandler(mg, ms, mt,
 		"/chat", time.Second*3)
@@ -280,4 +393,58 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 
 	assert.Equal(t, "failed to generate response: mock error", ms.Message)
 	require.Errorf(t, err, "failed to send reply")
+}
+
+func TestFindModelByMessage(t *testing.T) {
+	models := []domain.Model{
+		{Keyword: "gpt"},
+		{Keyword: "claude"},
+	}
+	defaultModel := domain.Model{Keyword: "default"}
+
+	handler := &ChatHandler{
+		models:       models,
+		defaultModel: defaultModel,
+	}
+
+	tests := []struct {
+		name        string
+		message     string
+		wantModel   domain.Model
+		wantMessage string
+	}{
+		{
+			name:        "Match GPT model keyword (case-insensitive)",
+			message:     "Hello #GPT",
+			wantModel:   models[0],
+			wantMessage: "Hello ",
+		},
+		{
+			name:        "Match Claude model keyword",
+			message:     "Please use #claude for this",
+			wantModel:   models[1],
+			wantMessage: "Please use  for this",
+		},
+		{
+			name:        "No keyword, fallback to default",
+			message:     "Just a normal message",
+			wantModel:   defaultModel,
+			wantMessage: "Just a normal message",
+		},
+		{
+			name:        "Multiple keywords, first match is returned",
+			message:     "#gpt and #claude in text",
+			wantModel:   models[0],
+			wantMessage: " and #claude in text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := tt.message
+			gotModel := handler.findModelByMessage(&msg)
+			assert.Equal(t, tt.wantModel, gotModel)
+			assert.Equal(t, tt.wantMessage, msg)
+		})
+	}
 }

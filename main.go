@@ -69,8 +69,8 @@ func main() {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
 	falGenerator := generator.NewFALGenerator(
-		viper.GetString("fal.flux_url"),
-		viper.GetString("fal.edit_url"),
+		viper.GetString("fal.image_gen_url"),
+		viper.GetString("fal.image_edit_url"),
 		viper.GetString("fal.whisper_url"),
 		viper.GetString("fal.api_key"))
 

@@ -13,6 +13,7 @@ import (
 
 type MockImageGenerator struct {
 	response string
+	imageURL string
 	err      error
 	Message  string
 }
@@ -23,21 +24,23 @@ func (m *MockImageGenerator) GenerateFromPrompt(_ context.Context, prompt string
 }
 
 func (m *MockImageGenerator) EditFromPrompt(_ context.Context, _ domain.Prompt) (string, error) {
-	return "", nil
+	return m.imageURL, m.err
 }
 
 type MockImageSender struct {
-	err     error
-	Message string
+	calledURL string
+	called    bool
+	err       error
 }
 
-func (m *MockImageSender) SendImageURLReply(_ context.Context, _ *domain.Message, url string) error {
-	m.Message = url
+func (m *MockImageSender) SendImageURLReply(_ context.Context, _ *domain.Message, imageURL string) error {
+	m.calledURL = imageURL
+	m.called = true
 	return m.err
 }
 
 func (m *MockImageSender) SendImageFileReply(_ context.Context, _ *domain.Message, file []byte) error {
-	m.Message = string(file)
+	m.calledURL = string(file)
 	return m.err
 }
 
@@ -63,7 +66,7 @@ func TestImageRepondSuccessful(t *testing.T) {
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
 	require.NoError(t, err)
 
-	assert.Equal(t, "https://example.org/image.png", mi.Message)
+	assert.Equal(t, "https://example.org/image.png", mi.calledURL)
 }
 
 func TestImageRepondSendFailed(t *testing.T) {

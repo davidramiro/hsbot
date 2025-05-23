@@ -29,10 +29,7 @@ func NewFALGenerator(fluxAPIURL, omnigenAPIURL, whisperAPIURL, apiKey string) *F
 }
 
 type fluxImageRequest struct {
-	Prompt              string `json:"prompt"`
-	EnableSafetyChecker bool   `json:"enable_safety_checker"`
-	SafetyTolerance     string `json:"safety_tolerance"`
-	ImageSize           string `json:"image_size"`
+	Prompt string `json:"prompt"`
 }
 
 type imageEditRequest struct {
@@ -43,18 +40,14 @@ type imageEditRequest struct {
 
 type imageResponse struct {
 	Images []struct {
-		URL         string `json:"url"`
-		ContentType string `json:"content_type"`
+		URL string `json:"url"`
 	} `json:"images"`
 	Prompt string `json:"prompt"`
 }
 
 func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (string, error) {
 	falRequest := fluxImageRequest{
-		Prompt:              prompt,
-		EnableSafetyChecker: false,
-		ImageSize:           "square",
-		SafetyTolerance:     "5",
+		Prompt: prompt,
 	}
 
 	payloadBuf := new(bytes.Buffer)
@@ -92,8 +85,8 @@ func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt)
 
 	falRequest := imageEditRequest{
 		Prompt:              prompt.Prompt,
-		EnableSafetyChecker: false,
 		InputImageURL:       prompt.ImageURL,
+		EnableSafetyChecker: false,
 	}
 
 	payloadBuf := new(bytes.Buffer)

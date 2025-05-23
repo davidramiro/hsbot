@@ -39,7 +39,7 @@ func (m *ModelHandler) Respond(ctx context.Context, _ time.Duration, message *do
 	}
 
 	for _, model := range models {
-		_, err = fmt.Fprintf(sb, "Model: %s, Keyword: %s\n", model.Identifier, model.Keyword)
+		_, err = fmt.Fprintf(sb, " - Model: %s, Keyword: %s\n", model.Identifier, model.Keyword)
 		if err != nil {
 			return fmt.Errorf("failed to construct response: %w", err)
 		}

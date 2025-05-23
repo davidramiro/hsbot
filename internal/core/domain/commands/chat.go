@@ -96,12 +96,6 @@ func (c *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 		return err
 	}
 
-	if promptText == "" {
-		if err := c.textSender.NotifyAndReturnError(ctx, domain.ErrEmptyPrompt, message); err != nil {
-			return err
-		}
-	}
-
 	conversation, err := c.getConversationForMessage(message)
 	if err != nil {
 		if err := c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to get conversation: %w", err),
@@ -244,8 +238,11 @@ func (c *ChatHandler) startConversationTimer(convo *Conversation) {
 
 func (c *ChatHandler) findModelByMessage(message *string) domain.Model {
 	for _, model := range c.models {
-		if strings.Contains(strings.ToLower(*message), "#"+strings.ToLower(model.Keyword)) {
-			*message = strings.ReplaceAll(*message, "#"+strings.ToLower(model.Keyword), "")
+		lowercaseMessage := strings.ToLower(*message)
+		lowerCaseModel := strings.ToLower("#" + model.Keyword)
+		if strings.Contains(lowercaseMessage, lowerCaseModel) {
+			i := strings.Index(lowercaseMessage, lowerCaseModel)
+			*message = (*message)[:i] + (*message)[i+len(lowerCaseModel):]
 			return model
 		}
 	}
