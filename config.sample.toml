@@ -25,14 +25,14 @@ bot_token = "4242:telegram-bot-token"
 [openrouter]
 api_key = "sk-api-key"
 models = [
-    { keyword = "claude", identifier = "anthropic/claude-3.5-sonnet:beta"},
+    { keyword = "claude", identifier = "anthropic/claude-sonnet-4"},
     { keyword = "gpt", identifier = "openai/gpt-4.1"},
     { keyword = "gemini", identifier = "google/gemini-2.5-pro-preview"},
     { keyword = "grok", identifier = "x-ai/grok-3-beta"},
     { keyword = "deepseek", identifier = "deepseek/deepseek-chat-v3-0324"},
     { keyword = "unslop", identifier = "thedrummer/unslopnemo-12b"},
 ]
-default_model = { keyword = "claude", identifier = "anthropic/claude-3.5-sonnet:beta"}
+default_model = { keyword = "claude", identifier = "anthropic/claude-sonnet-4"}
 
 [fal]
 api_key = "4242:1234"
