@@ -38,4 +38,4 @@ default_model = { keyword = "claude", identifier = "anthropic/claude-sonnet-4"}
 api_key = "4242:1234"
 flux_url = "https://fal.run/fal-ai/flux-pro/v1.1"
 whisper_url = "https://fal.run/fal-ai/whisper"
-omnigen_url = "https://fal.run/fal-ai/omnigen-v1"
+edit_url = "https://fal.run/fal-ai/omnigen-v1"

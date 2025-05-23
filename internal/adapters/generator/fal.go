@@ -36,13 +36,10 @@ type fluxImageRequest struct {
 }
 
 type imageEditRequest struct {
-	Prompt              string   `json:"prompt"`
-	EnableSafetyChecker bool     `json:"enable_safety_checker"`
-	ImageSize           string   `json:"image_size"`
-	InputImageUrls      []string `json:"input_image_urls"`
+	Prompt              string `json:"prompt"`
+	EnableSafetyChecker bool   `json:"enable_safety_checker"`
+	InputImageURL       string `json:"image_url"`
 }
-
-const imgIdentifierPrompt = ": <img><|image_1|></img>"
 
 type imageResponse struct {
 	Images []struct {
@@ -94,10 +91,9 @@ func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt)
 	}
 
 	falRequest := imageEditRequest{
-		Prompt:              prompt.Prompt + imgIdentifierPrompt,
+		Prompt:              prompt.Prompt,
 		EnableSafetyChecker: false,
-		ImageSize:           "square",
-		InputImageUrls:      []string{prompt.ImageURL},
+		InputImageURL:       prompt.ImageURL,
 	}
 
 	payloadBuf := new(bytes.Buffer)

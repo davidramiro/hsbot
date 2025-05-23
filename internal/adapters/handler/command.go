@@ -28,7 +28,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		update.Message.Text = update.Message.Caption
 	}
 
-	log.Debug().Str("message", update.Message.Text).Msg("registering chat command handler")
+	log.Debug().Str("message", update.Message.Text).Msg("received command")
 
 	cmd := domain.ParseCommand(update.Message.Text)
 	commandHandler, err := h.commandRegistry.Get(cmd)

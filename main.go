@@ -70,7 +70,7 @@ func main() {
 	}
 	falGenerator := generator.NewFALGenerator(
 		viper.GetString("fal.flux_url"),
-		viper.GetString("fal.omnigen_url"),
+		viper.GetString("fal.edit_url"),
 		viper.GetString("fal.whisper_url"),
 		viper.GetString("fal.api_key"))
 
