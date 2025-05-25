@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hsbot/internal/core/domain"
 	"io"
 	"net/http"
@@ -54,29 +55,26 @@ func (f *FAL) GenerateFromPrompt(ctx context.Context, prompt string) (string, er
 	payloadBuf := new(bytes.Buffer)
 	err := json.NewEncoder(payloadBuf).Encode(falRequest)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error encoding FAL request: %w", err)
 	}
 
 	body, err := f.postFALRequest(ctx, f.imageGenerationEndpoint, payloadBuf)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("FAL request failed: %w", err)
 	}
 
-	log.Info().Interface("body", body).Msg("FAL imageResponse")
+	log.Debug().Interface("body", body).Msg("FAL imageResponse")
 
 	var result imageResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		log.Error().Err(err).Msg("error unmarshalling FAL imageResponse")
-		return "", err
+		return "", fmt.Errorf("error unmarshalling FAL imageResponse: %w", err)
 	}
 
 	if len(result.Images) == 0 {
-		err = errors.New("no images returned")
-		log.Error().Err(err).Send()
-		return "", err
+		return "", errors.New("no images returned from FAL response")
 	}
 
-	log.Info().Interface("result", result).Msg("FAL imageResponse")
+	log.Debug().Interface("result", result).Msg("FAL imageResponse")
 
 	return result.Images[0].URL, nil
 }
@@ -99,29 +97,26 @@ func (f *FAL) EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string,
 	payloadBuf := new(bytes.Buffer)
 	err := json.NewEncoder(payloadBuf).Encode(falRequest)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error encoding FAL request: %w", err)
 	}
 
 	body, err := f.postFALRequest(ctx, f.imageEditingEndpoint, payloadBuf)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("FAL request failed: %w", err)
 	}
 
-	log.Info().Interface("body", body).Msg("FAL imageResponse")
+	log.Debug().Interface("body", body).Msg("FAL imageResponse")
 
 	var result imageResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		log.Error().Err(err).Msg("error unmarshalling FAL imageResponse")
-		return "", err
+		return "", fmt.Errorf("error unmarshalling FAL imageResponse: %w", err)
 	}
 
 	if len(result.Images) == 0 {
-		err = errors.New("no images returned")
-		log.Error().Err(err).Send()
-		return "", err
+		return "", errors.New("no images returned from FAL response")
 	}
 
-	log.Info().Interface("result", result).Msg("FAL imageResponse")
+	log.Debug().Interface("result", result).Msg("FAL imageResponse")
 
 	return result.Images[0].URL, nil
 }
@@ -142,22 +137,22 @@ func (f *FAL) GenerateFromAudio(ctx context.Context, url string) (string, error)
 	payloadBuf := new(bytes.Buffer)
 	err := json.NewEncoder(payloadBuf).Encode(falRequest)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error encoding FAL request: %w", err)
 	}
 
 	body, err := f.postFALRequest(ctx, f.whisperEndpoint, payloadBuf)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error executing FAL request: %w", err)
 	}
-	log.Info().Interface("body", body).Msg("FAL audioResponse")
+
+	log.Debug().Interface("body", body).Msg("FAL audioResponse")
 
 	var result audioResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		log.Error().Err(err).Msg("error unmarshalling FAL audioResponse")
-		return "", err
+		return "", fmt.Errorf("error unmarshalling FAL audioResponse: %w", err)
 	}
 
-	log.Info().Interface("result", result).Msg("FAL audioResponse")
+	log.Debug().Interface("result", result).Msg("FAL audioResponse")
 
 	return result.Text, nil
 }
@@ -175,16 +170,14 @@ func (f *FAL) postFALRequest(ctx context.Context, url string, payloadBuf *bytes.
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Error().Err(err).Msg("error executing request to FAL")
-		return nil, err
+		return nil, fmt.Errorf("error executing FAL request: %w", err)
 	}
 
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Error().Err(err).Msg("error parsing FAL response")
-		return nil, err
+		return nil, fmt.Errorf("error reading FAL response: %w", err)
 	}
 	return body, nil
 }

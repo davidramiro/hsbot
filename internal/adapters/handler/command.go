@@ -47,7 +47,7 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 	if update.Message.ReplyToMessage != nil {
 		botUser, err := b.GetMe(ctx)
 		if err != nil {
-			log.Debug().Str("command", cmd).Msg("failed to get bot user")
+			log.Err(err).Str("command", cmd).Msg("failed to get bot user")
 			return
 		}
 		if update.Message.ReplyToMessage.From.ID == botUser.ID {

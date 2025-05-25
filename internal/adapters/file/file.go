@@ -24,23 +24,17 @@ func DownloadFile(ctx context.Context, path string) ([]byte, error) {
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		err = fmt.Errorf("error executing request %w", err)
-		log.Error().Err(err).Str("path", path).Send()
-		return nil, err
+		return nil, fmt.Errorf("error executing request for path %s: %w", path, err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf("unexpected status code on download: %d", res.StatusCode)
-		log.Error().Err(err).Str("path", path).Send()
-		return nil, err
+		return nil, fmt.Errorf("unexpected status code on download for path %s: %d", path, res.StatusCode)
 	}
 
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		err = fmt.Errorf("error reading response %w", err)
-		log.Error().Err(err).Str("path", path).Send()
-		return nil, err
+		return nil, fmt.Errorf("error reading response of download for path %s: %w", path, err)
 	}
 
 	return buf, nil
@@ -59,17 +53,13 @@ func SaveTempFile(data []byte, extension string) (string, error) {
 
 	f, err := os.Create(path)
 	if err != nil {
-		err = fmt.Errorf("error creating temp file %w", err)
-		log.Error().Err(err).Send()
-		return "", err
+		return "", fmt.Errorf("error creating temp file %w", err)
 	}
 
 	defer f.Close()
 
 	if _, err := f.Write(data); err != nil {
-		err = fmt.Errorf("error writing temp file %w", err)
-		log.Error().Err(err).Send()
-		return "", err
+		return "", fmt.Errorf("error writing temp file %w", err)
 	}
 
 	log.Debug().Str("path", f.Name()).Msg("created file")
@@ -81,9 +71,7 @@ func SaveTempFile(data []byte, extension string) (string, error) {
 func GetTempFile(path string) ([]byte, error) {
 	buf, err := os.ReadFile(path)
 	if err != nil {
-		err = fmt.Errorf("error reading temp file %w", err)
-		log.Error().Err(err).Send()
-		return nil, err
+		return nil, fmt.Errorf("error reading temp file %w", err)
 	}
 
 	return buf, nil

@@ -47,8 +47,7 @@ func (s *Telegram) SendMessageReply(
 			},
 		})
 		if err != nil {
-			log.Error().Err(err).Msg("failed to send text response")
-			return -1, err
+			return -1, fmt.Errorf("failed to send message: %w", err)
 		}
 
 		lastSentID = sent.ID
@@ -69,8 +68,7 @@ func (s *Telegram) SendImageURLReply(ctx context.Context, message *domain.Messag
 
 	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send photo response")
-		return err
+		return fmt.Errorf("failed to send image: %w", err)
 	}
 
 	return nil
@@ -89,8 +87,7 @@ func (s *Telegram) SendImageFileReply(ctx context.Context, message *domain.Messa
 
 	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send file response")
-		return err
+		return fmt.Errorf("failed to send image: %w", err)
 	}
 
 	return nil

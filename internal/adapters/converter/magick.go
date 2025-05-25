@@ -70,10 +70,8 @@ func (m *Magick) Scale(ctx context.Context, imageURL string, power float32) ([]b
 
 	// #nosec G204: only a float as user input
 	cmd := exec.Command(command[0], command[1:]...)
-	out, err := cmd.Output()
-	if err != nil {
-		log.Error().Bytes("magickStderr", out).Msg("magick command failed")
-		return nil, err
+	if cmd.Err != nil {
+		return nil, fmt.Errorf("error executing command: %w", cmd.Err)
 	}
 
 	log.Debug().Msg("magick command finished")
