@@ -15,23 +15,24 @@ import (
 const MaxPower = 100
 const PowerFactor = 1.3
 
-type MagickConverter struct {
+// Magick uses local execution with ImageMagick to transform images.
+type Magick struct {
 	magickBinary []string
 }
 
-func NewMagickConverter() (*MagickConverter, error) {
-	eh := &MagickConverter{}
+func NewMagick() (*Magick, error) {
+	eh := &Magick{}
 	commands := [][]string{{"magick", "convert", "-version"}, {"convert", "-version"}}
 
 	for _, command := range commands {
 		// #nosec G204: no user input
 		_, err := exec.Command(command[0], command[1:]...).Output()
 		if err != nil {
-			log.Debug().Strs("commands", command).Msg("binary not found")
+			log.Debug().Strs("command", command).Msg("binary not found")
 			continue
 		}
 
-		log.Debug().Strs("commands", command).Msg("binary found")
+		log.Debug().Strs("command", command).Msg("binary found")
 		eh.magickBinary = command[:len(command)-1]
 		break
 	}
@@ -43,7 +44,7 @@ func NewMagickConverter() (*MagickConverter, error) {
 	return eh, nil
 }
 
-func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power float32) ([]byte, error) {
+func (m *Magick) Scale(ctx context.Context, imageURL string, power float32) ([]byte, error) {
 	f, err := file.DownloadFile(ctx, imageURL)
 	if err != nil {
 		return nil, err
@@ -71,15 +72,16 @@ func (m *MagickConverter) Scale(ctx context.Context, imageURL string, power floa
 	cmd := exec.Command(command[0], command[1:]...)
 	out, err := cmd.Output()
 	if err != nil {
-		log.Error().Bytes("magickStderr", out).Msg("magick commands failed")
+		log.Error().Bytes("magickStderr", out).Msg("magick command failed")
 		return nil, err
 	}
 
-	log.Debug().Msg("magick commands finished")
+	log.Debug().Msg("magick command finished")
 
 	return file.GetTempFile(outFile)
 }
 
+// createCommand builds an ImageMagick command with args for the wanted result.
 func createCommand(baseCommands []string, power float32, inFile, outFile string) []string {
 	size := MaxPower - (power / PowerFactor)
 	dimensions := fmt.Sprintf("%d%%x%d%%", int(size), int(size))

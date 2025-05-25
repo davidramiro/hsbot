@@ -14,15 +14,22 @@ import (
 
 const TelegramMessageLimit = 4096
 
-type TelegramSender struct {
-	bot *bot.Bot
+// TelegramBotAPI is a wrapper interface for all the used methods of the *bot.Bot struct. Used for mocking in tests.
+type TelegramBotAPI interface {
+	SendMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error)
+	SendPhoto(ctx context.Context, params *bot.SendPhotoParams) (*models.Message, error)
+	SendChatAction(ctx context.Context, params *bot.SendChatActionParams) (bool, error)
 }
 
-func NewTelegramSender(bot *bot.Bot) *TelegramSender {
-	return &TelegramSender{bot: bot}
+type Telegram struct {
+	bot TelegramBotAPI
 }
 
-func (s *TelegramSender) SendMessageReply(
+func NewTelegram(bot TelegramBotAPI) *Telegram {
+	return &Telegram{bot: bot}
+}
+
+func (s *Telegram) SendMessageReply(
 	ctx context.Context,
 	message *domain.Message,
 	text string) (int, error) {
@@ -50,7 +57,7 @@ func (s *TelegramSender) SendMessageReply(
 	return lastSentID, nil
 }
 
-func (s *TelegramSender) SendImageURLReply(ctx context.Context, message *domain.Message, url string) error {
+func (s *Telegram) SendImageURLReply(ctx context.Context, message *domain.Message, url string) error {
 	params := &bot.SendPhotoParams{
 		ChatID: message.ChatID,
 		ReplyParameters: &models.ReplyParameters{
@@ -69,7 +76,7 @@ func (s *TelegramSender) SendImageURLReply(ctx context.Context, message *domain.
 	return nil
 }
 
-func (s *TelegramSender) SendImageFileReply(ctx context.Context, message *domain.Message, file []byte) error {
+func (s *Telegram) SendImageFileReply(ctx context.Context, message *domain.Message, file []byte) error {
 	params := &bot.SendPhotoParams{
 		ChatID: message.ChatID,
 		Photo: &models.InputFileUpload{Filename: fmt.Sprintf("%d.png", message.ID),
@@ -91,7 +98,7 @@ func (s *TelegramSender) SendImageFileReply(ctx context.Context, message *domain
 
 const ChatActionRepeatSeconds = 5
 
-func (s *TelegramSender) SendChatAction(ctx context.Context, chatID int64, action domain.Action) {
+func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action domain.Action) {
 	log.Debug().Int64("chatID", chatID).Msg("starting action routine")
 
 	for {
@@ -127,11 +134,11 @@ func (s *TelegramSender) SendChatAction(ctx context.Context, chatID int64, actio
 	}
 }
 
-func (s *TelegramSender) NotifyAndReturnError(ctx context.Context, err error, message *domain.Message) error {
+func (s *Telegram) NotifyAndReturnError(ctx context.Context, err error, message *domain.Message) error {
 	_, err2 := s.SendMessageReply(ctx,
 		message,
 		fmt.Sprintf("error: %s", err))
-	if err != nil {
+	if err2 != nil {
 		return fmt.Errorf("failed sending error message: %w: %w", err, err2)
 	}
 	return err

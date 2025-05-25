@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -402,7 +402,7 @@ func TestFindModelByMessage(t *testing.T) {
 	}
 	defaultModel := domain.Model{Keyword: "default"}
 
-	handler := &ChatHandler{
+	handler := &Chat{
 		models:       models,
 		defaultModel: defaultModel,
 	}

@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ImageHandler struct {
+type Image struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
@@ -21,23 +21,23 @@ type ImageHandler struct {
 func NewImageHandler(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	command string) *ImageHandler {
-	return &ImageHandler{imageGenerator: imageGenerator,
+	command string) *Image {
+	return &Image{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
 		command:     command}
 }
 
-func (h *ImageHandler) GetCommand() string {
-	return h.command
+func (i *Image) GetCommand() string {
+	return i.command
 }
 
-func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("imageURL", message.ImageURL).
-		Str("command", h.GetCommand()).
+		Str("command", i.GetCommand()).
 		Logger()
 
 	l.Info().Msg("handling request")
@@ -45,24 +45,24 @@ func (h *ImageHandler) Respond(ctx context.Context, timeout time.Duration, messa
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	go h.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
+	go i.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
 
-	prompt := domain.ParseCommandArgs(message.Text)
+	prompt := ParseCommandArgs(message.Text)
 	if prompt == "" {
-		_ = h.textSender.NotifyAndReturnError(ctx, errors.New("missing image prompt"), message)
+		_ = i.textSender.NotifyAndReturnError(ctx, errors.New("missing image prompt"), message)
 		return nil
 	}
 
-	imageURL, err := h.imageGenerator.GenerateFromPrompt(ctx, prompt)
+	imageURL, err := i.imageGenerator.GenerateFromPrompt(ctx, prompt)
 	if err != nil {
 		err = fmt.Errorf("error generating image: %w", err)
-		return h.textSender.NotifyAndReturnError(ctx, err, message)
+		return i.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	err = h.imageSender.SendImageURLReply(ctx, message, imageURL)
+	err = i.imageSender.SendImageURLReply(ctx, message, imageURL)
 	if err != nil {
 		err = fmt.Errorf("error sending edited image: %w", err)
-		return h.textSender.NotifyAndReturnError(ctx, err, message)
+		return i.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
 	return nil

@@ -8,13 +8,20 @@ import (
 	"github.com/revrost/go-openrouter"
 )
 
-type OpenRouterGenerator struct {
-	client       *openrouter.Client
+// OpenRouter wraps the OpenRouter API.
+type OpenRouter struct {
+	client       OpenRouterClient
 	systemPrompt string
 }
 
-func NewOpenRouterGenerator(apiKey, systemPrompt string) *OpenRouterGenerator {
-	return &OpenRouterGenerator{
+// OpenRouterClient wraps all used methods from *openrouter.Client. Used for mocking in tests.
+type OpenRouterClient interface {
+	CreateChatCompletion(ctx context.Context,
+		ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error)
+}
+
+func NewOpenRouterGenerator(apiKey, systemPrompt string) *OpenRouter {
+	return &OpenRouter{
 		systemPrompt: systemPrompt,
 		client: openrouter.NewClient(
 			apiKey,
@@ -23,7 +30,7 @@ func NewOpenRouterGenerator(apiKey, systemPrompt string) *OpenRouterGenerator {
 	}
 }
 
-func (c *OpenRouterGenerator) GenerateFromPrompt(
+func (c *OpenRouter) GenerateFromPrompt(
 	ctx context.Context, prompts []domain.Prompt) (domain.ModelResponse, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(prompts)+1)
 

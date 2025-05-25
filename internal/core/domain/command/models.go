@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -9,25 +9,25 @@ import (
 	"time"
 )
 
-type ModelHandler struct {
-	ch      *ChatHandler
+type Models struct {
+	ch      *Chat
 	ts      port.TextSender
 	command string
 }
 
-func NewModelHandler(ch *ChatHandler, ts port.TextSender, command string) *ModelHandler {
-	return &ModelHandler{
+func NewModels(ch *Chat, ts port.TextSender, command string) *Models {
+	return &Models{
 		ch:      ch,
 		ts:      ts,
 		command: command,
 	}
 }
 
-func (m *ModelHandler) GetCommand() string {
+func (m *Models) GetCommand() string {
 	return m.command
 }
 
-func (m *ModelHandler) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
+func (m *Models) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
 	models := m.ch.models
 
 	sb := &strings.Builder{}

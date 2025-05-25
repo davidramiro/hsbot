@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -11,21 +11,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type TranscribeHandler struct {
+type Transcribe struct {
 	transcriber port.Transcriber
 	textSender  port.TextSender
 	command     string
 }
 
-func NewTranscribeHandler(transcriber port.Transcriber, textSender port.TextSender, command string) *TranscribeHandler {
-	return &TranscribeHandler{transcriber: transcriber, textSender: textSender, command: command}
+func NewTranscribe(transcriber port.Transcriber, textSender port.TextSender, command string) *Transcribe {
+	return &Transcribe{transcriber: transcriber, textSender: textSender, command: command}
 }
 
-func (h *TranscribeHandler) GetCommand() string {
+func (h *Transcribe) GetCommand() string {
 	return h.command
 }
 
-func (h *TranscribeHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+func (h *Transcribe) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).

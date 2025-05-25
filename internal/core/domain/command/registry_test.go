@@ -1,7 +1,8 @@
-package domain
+package command
 
 import (
 	"context"
+	"hsbot/internal/core/domain"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ type MockResponder struct {
 	command string
 }
 
-func (m *MockResponder) Respond(_ context.Context, _ time.Duration, _ *Message) error {
+func (m *MockResponder) Respond(_ context.Context, _ time.Duration, _ *domain.Message) error {
 	return nil
 }
 
@@ -22,7 +23,7 @@ func (m *MockResponder) GetCommand() string {
 }
 
 func TestRegister(t *testing.T) {
-	cr := &CommandRegistry{}
+	cr := &Registry{}
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
@@ -30,14 +31,14 @@ func TestRegister(t *testing.T) {
 }
 
 func TestGetNotRegistered(t *testing.T) {
-	cr := &CommandRegistry{}
+	cr := &Registry{}
 
 	_, err := cr.Get("test")
-	require.Errorf(t, err, "can't fetch commands, registry not initialized")
+	require.Errorf(t, err, "can't fetch command, registry not initialized")
 }
 
 func TestGetCommandNotFound(t *testing.T) {
-	cr := &CommandRegistry{}
+	cr := &Registry{}
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
@@ -48,7 +49,7 @@ func TestGetCommandNotFound(t *testing.T) {
 }
 
 func TestGetCommandFound(t *testing.T) {
-	cr := &CommandRegistry{}
+	cr := &Registry{}
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
@@ -62,7 +63,7 @@ func TestGetCommandFound(t *testing.T) {
 }
 
 func TestListServices(t *testing.T) {
-	cr := &CommandRegistry{}
+	cr := &Registry{}
 	mr1 := &MockResponder{command: "/foo"}
 	mr2 := &MockResponder{command: "/bar"}
 

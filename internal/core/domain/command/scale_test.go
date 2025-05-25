@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func TestNewScaleHandler(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	assert.NotNil(t, scaleHandler)
 	assert.Equal(t, "/scale", scaleHandler.GetCommand())
@@ -36,7 +36,7 @@ func TestScaleRespondSuccessful(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -51,7 +51,7 @@ func TestScaleRespondMissingImage(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -66,7 +66,7 @@ func TestScaleRespondInvalidParam(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -81,7 +81,7 @@ func TestScaleRespondInvalidParamAndErrorSending(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{err: errors.New("mock error")}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -96,7 +96,7 @@ func TestScaleRespondErrorScaleFailed(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -111,7 +111,7 @@ func TestScaleRespondErrorScaleFailedAndErrorSending(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{err: errors.New("mock error")}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1
@@ -126,7 +126,7 @@ func TestScaleRespondSendImageFailed(t *testing.T) {
 	ms := &MockImageSender{err: errors.New("mock error")}
 	ts := &MockTextSender{}
 
-	scaleHandler := NewScaleHandler(mg, ts, ms, "/scale")
+	scaleHandler := NewScale(mg, ts, ms, "/scale")
 
 	id := new(int)
 	*id = 1

@@ -12,23 +12,24 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type FALGenerator struct {
-	falAPIKey     string
-	fluxAPIURL    string
-	whisperAPIURL string
-	omnigenAPIURL string
+// FAL provides a wrapper for the FAL API.
+type FAL struct {
+	falAPIKey               string
+	imageGenerationEndpoint string
+	whisperEndpoint         string
+	imageEditingEndpoint    string
 }
 
-func NewFALGenerator(fluxAPIURL, omnigenAPIURL, whisperAPIURL, apiKey string) *FALGenerator {
-	return &FALGenerator{
-		falAPIKey:     apiKey,
-		fluxAPIURL:    fluxAPIURL,
-		whisperAPIURL: whisperAPIURL,
-		omnigenAPIURL: omnigenAPIURL,
+func NewFAL(imageGenerationEndpoint, imageEditingEndpoint, whisperEndpoint, apiKey string) *FAL {
+	return &FAL{
+		falAPIKey:               apiKey,
+		imageGenerationEndpoint: imageGenerationEndpoint,
+		whisperEndpoint:         whisperEndpoint,
+		imageEditingEndpoint:    imageEditingEndpoint,
 	}
 }
 
-type fluxImageRequest struct {
+type imageGenerationRequest struct {
 	Prompt string `json:"prompt"`
 }
 
@@ -45,8 +46,8 @@ type imageResponse struct {
 	Prompt string `json:"prompt"`
 }
 
-func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (string, error) {
-	falRequest := fluxImageRequest{
+func (f *FAL) GenerateFromPrompt(ctx context.Context, prompt string) (string, error) {
+	falRequest := imageGenerationRequest{
 		Prompt: prompt,
 	}
 
@@ -56,7 +57,7 @@ func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (s
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.fluxAPIURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.imageGenerationEndpoint, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -69,12 +70,18 @@ func (f *FALGenerator) GenerateFromPrompt(ctx context.Context, prompt string) (s
 		return "", err
 	}
 
+	if len(result.Images) == 0 {
+		err = errors.New("no images returned")
+		log.Error().Err(err).Send()
+		return "", err
+	}
+
 	log.Info().Interface("result", result).Msg("FAL imageResponse")
 
 	return result.Images[0].URL, nil
 }
 
-func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string, error) {
+func (f *FAL) EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string, error) {
 	if len(prompt.Prompt) == 0 {
 		return "", errors.New("missing prompt")
 	}
@@ -95,7 +102,7 @@ func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt)
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.omnigenAPIURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.imageEditingEndpoint, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -105,6 +112,12 @@ func (f *FALGenerator) EditFromPrompt(ctx context.Context, prompt domain.Prompt)
 	var result imageResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		log.Error().Err(err).Msg("error unmarshalling FAL imageResponse")
+		return "", err
+	}
+
+	if len(result.Images) == 0 {
+		err = errors.New("no images returned")
+		log.Error().Err(err).Send()
 		return "", err
 	}
 
@@ -121,7 +134,7 @@ type audioResponse struct {
 	Text string `json:"text"`
 }
 
-func (f *FALGenerator) GenerateFromAudio(ctx context.Context, url string) (string, error) {
+func (f *FAL) GenerateFromAudio(ctx context.Context, url string) (string, error) {
 	falRequest := audioRequest{
 		AudioURL: url,
 	}
@@ -132,7 +145,7 @@ func (f *FALGenerator) GenerateFromAudio(ctx context.Context, url string) (strin
 		return "", err
 	}
 
-	body, err := f.postFALRequest(ctx, f.whisperAPIURL, payloadBuf)
+	body, err := f.postFALRequest(ctx, f.whisperEndpoint, payloadBuf)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +162,7 @@ func (f *FALGenerator) GenerateFromAudio(ctx context.Context, url string) (strin
 	return result.Text, nil
 }
 
-func (f *FALGenerator) postFALRequest(ctx context.Context, url string, payloadBuf *bytes.Buffer) ([]byte, error) {
+func (f *FAL) postFALRequest(ctx context.Context, url string, payloadBuf *bytes.Buffer) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payloadBuf)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating POST request for FAL")

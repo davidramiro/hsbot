@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"hsbot/internal/core/domain"
+	"hsbot/internal/core/domain/command"
+	"hsbot/internal/core/port"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -10,16 +12,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type CommandHandler struct {
-	commandRegistry *domain.CommandRegistry
+type Command struct {
+	commandRegistry port.CommandRegistry
 	timeout         time.Duration
 }
 
-func NewCommandHandler(commandRegistry *domain.CommandRegistry, timeout time.Duration) *CommandHandler {
-	return &CommandHandler{commandRegistry: commandRegistry, timeout: timeout}
+func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration) *Command {
+	return &Command{commandRegistry: commandRegistry, timeout: timeout}
 }
 
-func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -30,8 +32,8 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 
 	log.Debug().Str("message", update.Message.Text).Msg("received command")
 
-	cmd := domain.ParseCommand(update.Message.Text)
-	commandHandler, err := h.commandRegistry.Get(cmd)
+	cmd := command.ParseCommand(update.Message.Text)
+	commandHandler, err := c.commandRegistry.Get(cmd)
 	if err != nil {
 		log.Debug().Str("command", cmd).Msg("no handler for command")
 		return
@@ -66,7 +68,7 @@ func (h *CommandHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	go getOptionalAudio(ctx, b, update, audioURL)
 
 	go func() {
-		err := commandHandler.Respond(ctx, h.timeout, &domain.Message{
+		err := commandHandler.Respond(ctx, c.timeout, &domain.Message{
 			ID:               update.Message.ID,
 			ChatID:           update.Message.Chat.ID,
 			Text:             update.Message.Text,

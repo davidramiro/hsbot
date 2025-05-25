@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func TestNewTranscribeHandler(t *testing.T) {
 	mt := &MockTranscriber{}
 	ts := &MockTextSender{}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	assert.NotNil(t, transcribeHandler)
 	assert.Equal(t, "/transcribe", transcribeHandler.GetCommand())
@@ -33,7 +33,7 @@ func TestTranscribeRespondSuccessful(t *testing.T) {
 	mt := &MockTranscriber{}
 	ts := &MockTextSender{}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	err := transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{AudioURL: "mock"})
 	require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestTranscribeRespondErrorGenerating(t *testing.T) {
 	mt := &MockTranscriber{err: errors.New("mock error")}
 	ts := &MockTextSender{}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	err := transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{AudioURL: "mock"})
 	require.Error(t, err)
@@ -57,7 +57,7 @@ func TestTranscribeRespondErrorGeneratingAndSending(t *testing.T) {
 	mt := &MockTranscriber{err: errors.New("mock error")}
 	ts := &MockTextSender{err: errors.New("mock error")}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	err := transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{AudioURL: "mock"})
 	require.Errorf(t, err, "mock error")
@@ -69,7 +69,7 @@ func TestTranscribeRespondErrorSending(t *testing.T) {
 	mt := &MockTranscriber{}
 	ts := &MockTextSender{err: errors.New("mock error")}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	_ = transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{AudioURL: "mock"})
 	assert.Equal(t, "error sending transcript: mock error", ts.Message)
@@ -79,7 +79,7 @@ func TestTranscribeRespondErrorEmptyURLAndSending(t *testing.T) {
 	mt := &MockTranscriber{}
 	ts := &MockTextSender{err: errors.New("mock error")}
 
-	transcribeHandler := NewTranscribeHandler(mt, ts, "/transcribe")
+	transcribeHandler := NewTranscribe(mt, ts, "/transcribe")
 
 	_ = transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{})
 	assert.Equal(t, "reply to an audio", ts.Message)

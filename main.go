@@ -6,8 +6,7 @@ import (
 	"hsbot/internal/adapters/generator"
 	"hsbot/internal/adapters/handler"
 	"hsbot/internal/adapters/sender"
-	"hsbot/internal/core/domain"
-	"hsbot/internal/core/domain/commands"
+	"hsbot/internal/core/domain/command"
 	"os"
 	"os/signal"
 	"time"
@@ -59,16 +58,16 @@ func main() {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
 
-	s := sender.NewTelegramSender(b)
+	s := sender.NewTelegram(b)
 
 	orGenerator := generator.NewOpenRouterGenerator(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
 
-	magickConverter, err := converter.NewMagickConverter()
+	magickConverter, err := converter.NewMagick()
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
-	falGenerator := generator.NewFALGenerator(
+	falGenerator := generator.NewFAL(
 		viper.GetString("fal.image_gen_url"),
 		viper.GetString("fal.image_edit_url"),
 		viper.GetString("fal.whisper_url"),
@@ -79,26 +78,26 @@ func main() {
 		log.Panic().Err(err).Msg("invalid timeout for chat context in config")
 	}
 
-	commandRegistry := &domain.CommandRegistry{}
+	commandRegistry := &command.Registry{}
 
-	chatHandler, err := commands.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout)
+	chatHandler, err := command.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing chat handler")
 	}
 
 	commandRegistry.Register(chatHandler)
-	commandRegistry.Register(commands.NewModelHandler(chatHandler, s, "/models"))
-	commandRegistry.Register(commands.NewImageHandler(falGenerator, s, s, "/image"))
-	commandRegistry.Register(commands.NewEditHandler(falGenerator, s, s, "/edit"))
-	commandRegistry.Register(commands.NewScaleHandler(magickConverter, s, s, "/scale"))
-	commandRegistry.Register(commands.NewTranscribeHandler(falGenerator, s, "/transcribe"))
+	commandRegistry.Register(command.NewModels(chatHandler, s, "/models"))
+	commandRegistry.Register(command.NewImageHandler(falGenerator, s, s, "/image"))
+	commandRegistry.Register(command.NewEditHandler(falGenerator, s, s, "/edit"))
+	commandRegistry.Register(command.NewScale(magickConverter, s, s, "/scale"))
+	commandRegistry.Register(command.NewTranscribe(falGenerator, s, "/transcribe"))
 
 	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
 	if err != nil {
 		log.Panic().Err(err).Msg("invalid timeout for handler in config")
 	}
 
-	commandHandler := handler.NewCommandHandler(commandRegistry, handlerTimeout)
+	commandHandler := handler.NewCommand(commandRegistry, handlerTimeout)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)

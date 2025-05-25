@@ -1,4 +1,4 @@
-package commands
+package command
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ChatHandler struct {
+type Chat struct {
 	textGenerator port.TextGenerator
 	textSender    port.TextSender
 	transcriber   port.Transcriber
@@ -37,7 +37,7 @@ type Conversation struct {
 }
 
 func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
-	command string, cacheDuration time.Duration) (*ChatHandler, error) {
+	command string, cacheDuration time.Duration) (*Chat, error) {
 	var models []domain.Model
 	err := viper.UnmarshalKey("openrouter.models", &models)
 	if err != nil {
@@ -57,7 +57,7 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 		Str("handler", "chat").
 		Logger()
 
-	h := &ChatHandler{
+	h := &Chat{
 		textGenerator: textGenerator,
 		textSender:    textSender,
 		transcriber:   transcriber,
@@ -71,11 +71,11 @@ func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender
 	return h, nil
 }
 
-func (c *ChatHandler) GetCommand() string {
+func (c *Chat) GetCommand() string {
 	return c.command
 }
 
-func (c *ChatHandler) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := c.l.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -153,7 +153,7 @@ func (c *ChatHandler) Respond(ctx context.Context, timeout time.Duration, messag
 	return nil
 }
 
-func (c *ChatHandler) getConversationForMessage(message *domain.Message) (*Conversation, error) {
+func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation, error) {
 	l := c.l.With().
 		Int("messageId", message.ID).
 		Int64("chatId", message.ChatID).
@@ -199,8 +199,8 @@ convo size: %d`,
 		length)
 }
 
-func (c *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
-	promptText := domain.ParseCommandArgs(message.Text)
+func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
+	promptText := ParseCommandArgs(message.Text)
 	if promptText == "" {
 		return "", domain.Model{}, domain.ErrEmptyPrompt
 	}
@@ -220,7 +220,7 @@ func (c *ChatHandler) extractPrompt(ctx context.Context, message *domain.Message
 	return promptText, model, nil
 }
 
-func (c *ChatHandler) startConversationTimer(convo *Conversation) {
+func (c *Chat) startConversationTimer(convo *Conversation) {
 	t := time.NewTimer(c.cacheDuration)
 
 	for {
@@ -236,7 +236,7 @@ func (c *ChatHandler) startConversationTimer(convo *Conversation) {
 	}
 }
 
-func (c *ChatHandler) findModelByMessage(message *string) domain.Model {
+func (c *Chat) findModelByMessage(message *string) domain.Model {
 	for _, model := range c.models {
 		lowercaseMessage := strings.ToLower(*message)
 		lowerCaseModel := strings.ToLower("#" + model.Keyword)
