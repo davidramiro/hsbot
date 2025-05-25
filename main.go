@@ -58,16 +58,17 @@ func main() {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
 
-	s := sender.NewTelegram(b)
+	t := sender.NewTelegram(b)
 
-	orGenerator := generator.NewOpenRouterGenerator(viper.GetString("openrouter.api_key"),
+	or := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
 
-	magickConverter, err := converter.NewMagick()
+	magick, err := converter.NewMagick()
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
-	falGenerator := generator.NewFAL(
+
+	fal := generator.NewFAL(
 		viper.GetString("fal.image_gen_url"),
 		viper.GetString("fal.image_edit_url"),
 		viper.GetString("fal.whisper_url"),
@@ -78,26 +79,26 @@ func main() {
 		log.Panic().Err(err).Msg("invalid timeout for chat context in config")
 	}
 
-	commandRegistry := &command.Registry{}
+	registry := &command.Registry{}
 
-	chatHandler, err := command.NewChatHandler(orGenerator, s, falGenerator, "/chat", convoTimeout)
+	chat, err := command.NewChat(or, t, fal, "/chat", convoTimeout)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing chat handler")
 	}
 
-	commandRegistry.Register(chatHandler)
-	commandRegistry.Register(command.NewModels(chatHandler, s, "/models"))
-	commandRegistry.Register(command.NewImageHandler(falGenerator, s, s, "/image"))
-	commandRegistry.Register(command.NewEditHandler(falGenerator, s, s, "/edit"))
-	commandRegistry.Register(command.NewScale(magickConverter, s, s, "/scale"))
-	commandRegistry.Register(command.NewTranscribe(falGenerator, s, "/transcribe"))
+	registry.Register(chat)
+	registry.Register(command.NewModels(chat, t, "/models"))
+	registry.Register(command.NewImage(fal, t, t, "/image"))
+	registry.Register(command.NewEdit(fal, t, t, "/edit"))
+	registry.Register(command.NewScale(magick, t, t, "/scale"))
+	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
 
 	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
 	if err != nil {
 		log.Panic().Err(err).Msg("invalid timeout for handler in config")
 	}
 
-	commandHandler := handler.NewCommand(commandRegistry, handlerTimeout)
+	commandHandler := handler.NewCommand(registry, handlerTimeout)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)

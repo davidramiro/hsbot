@@ -49,7 +49,7 @@ func TestNewImageHandler(t *testing.T) {
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 
-	imageHandler := NewImageHandler(mg, ms, ts, "/image")
+	imageHandler := NewImage(mg, ms, ts, "/image")
 
 	assert.NotNil(t, imageHandler)
 	assert.Equal(t, "/image", imageHandler.GetCommand())
@@ -60,7 +60,7 @@ func TestImageRepondSuccessful(t *testing.T) {
 	mi := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -74,7 +74,7 @@ func TestImageRepondSendFailed(t *testing.T) {
 	mi := &MockImageSender{err: errors.New("mock error")}
 	mt := &MockTextSender{}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -86,7 +86,7 @@ func TestImageRepondErrorEmptyPrompt(t *testing.T) {
 	mi := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
@@ -100,7 +100,7 @@ func TestImageRepondErrorGenerating(t *testing.T) {
 	mi := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -113,7 +113,7 @@ func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
 	mi := &MockImageSender{}
 	mt := &MockTextSender{err: errors.New("mock error")}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -126,7 +126,7 @@ func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
 	mi := &MockImageSender{}
 	mt := &MockTextSender{err: errors.New("mock error")}
 
-	imageHandler := NewImageHandler(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})

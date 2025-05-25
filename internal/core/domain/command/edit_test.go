@@ -15,7 +15,7 @@ func TestEditHandler_Success(t *testing.T) {
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	eh := NewEditHandler(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,
@@ -36,7 +36,7 @@ func TestEditHandler_EmptyPrompt(t *testing.T) {
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	eh := NewEditHandler(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, "/edit")
 
 	msg := &domain.Message{
 		ID:     1,
@@ -55,7 +55,7 @@ func TestEditHandler_MissingImage(t *testing.T) {
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	eh := NewEditHandler(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, "/edit")
 
 	msg := &domain.Message{
 		ID:     1,
@@ -74,7 +74,7 @@ func TestEditHandler_EditFromPromptError(t *testing.T) {
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
 
-	eh := NewEditHandler(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,
@@ -94,7 +94,7 @@ func TestEditHandler_SendImageURLReplyError(t *testing.T) {
 	ms := &MockImageSender{err: errors.New("send-failed")}
 	mt := &MockTextSender{}
 
-	eh := NewEditHandler(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,

@@ -60,7 +60,7 @@ func TestChatHandlerSimpleSuccess(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -76,7 +76,7 @@ func TestChatHandlerTranscribeSuccess(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -103,7 +103,7 @@ func TestChatHandlerTranscribeError(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{err: errors.New("foo")}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -120,7 +120,7 @@ func TestChatHandlerErrorEmptyPrompt(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -139,7 +139,7 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 
 	viper.SetDefault("bot.debug_replies", true)
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -158,7 +158,7 @@ func TestChatHandlerClearingCache(t *testing.T) {
 
 	viper.SetDefault("bot.debug_replies", false)
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -188,7 +188,7 @@ func TestChatHandlerCache(t *testing.T) {
 
 	viper.SetDefault("bot.debug_replies", false)
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -230,7 +230,7 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 
 	viper.SetDefault("bot.debug_replies", false)
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -279,7 +279,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 
 	viper.SetDefault("bot.debug_replies", false)
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -336,7 +336,7 @@ func TestGeneratorError(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -352,7 +352,7 @@ func TestEmptyPromptError(t *testing.T) {
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -368,7 +368,7 @@ func TestSendMessageError(t *testing.T) {
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
@@ -384,7 +384,7 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
 
-	chatHandler, _ := NewChatHandler(mg, ms, mt,
+	chatHandler, _ := NewChat(mg, ms, mt,
 		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)

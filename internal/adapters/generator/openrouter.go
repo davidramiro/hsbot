@@ -20,7 +20,7 @@ type OpenRouterClient interface {
 		ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error)
 }
 
-func NewOpenRouterGenerator(apiKey, systemPrompt string) *OpenRouter {
+func NewOpenRouter(apiKey, systemPrompt string) *OpenRouter {
 	return &OpenRouter{
 		systemPrompt: systemPrompt,
 		client: openrouter.NewClient(

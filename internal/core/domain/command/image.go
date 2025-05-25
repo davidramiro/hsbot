@@ -18,7 +18,7 @@ type Image struct {
 	command        string
 }
 
-func NewImageHandler(imageGenerator port.ImageGenerator,
+func NewImage(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
 	command string) *Image {

@@ -18,7 +18,7 @@ type Edit struct {
 	command        string
 }
 
-func NewEditHandler(imageGenerator port.ImageGenerator,
+func NewEdit(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
 	command string) *Edit {

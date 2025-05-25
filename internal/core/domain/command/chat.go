@@ -36,7 +36,7 @@ type Conversation struct {
 	chatID     int64
 }
 
-func NewChatHandler(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
+func NewChat(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
 	command string, cacheDuration time.Duration) (*Chat, error) {
 	var models []domain.Model
 	err := viper.UnmarshalKey("openrouter.models", &models)
