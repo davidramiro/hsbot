@@ -23,43 +23,40 @@ import (
 func main() {
 	log.Info().Msg("starting hsbot...")
 
-	viper.AddConfigPath(".")
-	viper.SetConfigType("toml")
-
-	log.Info().Msg("reading config file...")
-	err := viper.ReadInConfig()
+	err := initConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read config file")
 	}
 
-	var logLevel zerolog.Level
-
-	switch viper.GetString("bot.log_level") {
-	case "info":
-		logLevel = zerolog.InfoLevel
-	case "debug":
-		logLevel = zerolog.DebugLevel
-	default:
-		logLevel = zerolog.InfoLevel
-	}
-
-	zerolog.SetGlobalLevel(logLevel)
+	initLogger()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	token := viper.GetString("telegram.bot_token")
-	opts := []bot.Option{
-		bot.WithDefaultHandler(noOpHandler),
-	}
-
-	b, err := bot.New(token, opts...)
+	b, err := initBot()
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
 
 	t := sender.NewTelegram(b)
 
+	registry := initHandlers(t)
+
+	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
+	if err != nil {
+		log.Panic().Err(err).Msg("invalid timeout for handler in config")
+	}
+
+	commandHandler := handler.NewCommand(registry, handlerTimeout)
+
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
+
+	log.Info().Msg("bot listening")
+	b.Start(ctx)
+}
+
+func initHandlers(t *sender.Telegram) *command.Registry {
 	or := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
 
@@ -93,19 +90,40 @@ func main() {
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
 	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
+	registry.Register(command.NewDebug(t, "/debug"))
+	return registry
+}
 
-	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
-	if err != nil {
-		log.Panic().Err(err).Msg("invalid timeout for handler in config")
+func initBot() (*bot.Bot, error) {
+	token := viper.GetString("telegram.bot_token")
+	opts := []bot.Option{
+		bot.WithDefaultHandler(noOpHandler),
 	}
 
-	commandHandler := handler.NewCommand(registry, handlerTimeout)
+	return bot.New(token, opts...)
+}
 
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
-	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
+func initLogger() {
+	var logLevel zerolog.Level
 
-	log.Info().Msg("bot listening")
-	b.Start(ctx)
+	switch viper.GetString("bot.log_level") {
+	case "info":
+		logLevel = zerolog.InfoLevel
+	case "debug":
+		logLevel = zerolog.DebugLevel
+	default:
+		logLevel = zerolog.InfoLevel
+	}
+
+	zerolog.SetGlobalLevel(logLevel)
+}
+
+func initConfig() error {
+	viper.AddConfigPath(".")
+	viper.SetConfigType("toml")
+
+	log.Info().Msg("reading config file...")
+	return viper.ReadInConfig()
 }
 
 func noOpHandler(_ context.Context, _ *bot.Bot, _ *models.Update) {}
