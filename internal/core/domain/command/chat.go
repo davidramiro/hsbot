@@ -23,7 +23,7 @@ type Chat struct {
 	transcriber   port.Transcriber
 	cacheDuration time.Duration
 	command       string
-	cache         sync.Map
+	cache         *sync.Map
 	models        []domain.Model
 	defaultModel  domain.Model
 	l             *zerolog.Logger
@@ -63,6 +63,7 @@ func NewChat(textGenerator port.TextGenerator, textSender port.TextSender, trans
 		transcriber:   transcriber,
 		cacheDuration: cacheDuration,
 		command:       command,
+		cache:         &sync.Map{},
 		models:        models,
 		defaultModel:  model,
 		l:             &logger,

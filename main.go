@@ -92,6 +92,7 @@ func main() {
 	registry.Register(command.NewEdit(fal, t, t, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
 	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
+	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
 
 	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
 	if err != nil {
