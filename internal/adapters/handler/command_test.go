@@ -108,6 +108,28 @@ func TestCommandHandler_Handle(t *testing.T) {
 			},
 		},
 		{
+			name:   "known command with username tag, Respond called successfully",
+			update: makeUpdate("/hello@hsbot"),
+			mockSetup: func(r *MockRegistry, ch *MockCmdHandler) {
+				r.On("Get", "/hello").Return(ch, nil)
+				ch.On("Respond", mock.Anything, mock.Anything,
+					mock.AnythingOfType("*domain.Message")).Return(nil)
+			},
+			wantCalled: true,
+			wantMsg: &domain.Message{
+				ID:               1,
+				ChatID:           100,
+				Username:         "@bob",
+				ReplyToMessageID: new(int),
+				ReplyToUsername:  "",
+				IsReplyToBot:     false,
+				QuotedText:       "",
+				ImageURL:         "",
+				AudioURL:         "",
+				Text:             "/hello@hsbot",
+			},
+		},
+		{
 			name:   "known command, Respond returns error",
 			update: makeUpdate("/fail"),
 			mockSetup: func(r *MockRegistry, ch *MockCmdHandler) {
