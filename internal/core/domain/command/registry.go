@@ -38,6 +38,10 @@ func (r *Registry) Get(command string) (port.Command, error) {
 }
 
 func (r *Registry) ListCommands() []string {
+	if r.commands == nil {
+		return []string{}
+	}
+
 	keys := make([]string, len(r.commands))
 
 	i := 0
@@ -49,11 +53,17 @@ func (r *Registry) ListCommands() []string {
 	return keys
 }
 
+// ParseCommandArgs extracts the portion of the string after the first space, or returns an empty string if none exists.
 func ParseCommandArgs(args string) string {
-	command := strings.Split(args, " ")
-	return strings.Join(command[1:], " ")
+	idx := strings.IndexByte(args, ' ')
+	if idx == -1 {
+		return ""
+	}
+	return args[idx+1:]
+
 }
 
+// ParseCommand extracts the primary command from the input string, discarding arguments and handle, returning it in lowercase.
 func ParseCommand(args string) string {
 	command := strings.Split(args, " ")[0]
 	if strings.Contains(command, "@") {
