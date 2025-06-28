@@ -5,6 +5,7 @@ import (
 	"errors"
 	"hsbot/internal/core/domain"
 	"testing"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -222,5 +223,35 @@ func TestTelegramSender_NotifyAndReturnError(t *testing.T) {
 			}
 			mb.AssertExpectations(t)
 		})
+	}
+}
+
+func TestSendChatAction_RepeatsAndStopsOnContextCancel(t *testing.T) {
+	mb := new(MockBot)
+	sender := NewTelegram(mb)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	chatID := int64(12345)
+	action := domain.Typing
+
+	mb.On("SendChatAction", mock.Anything, &bot.SendChatActionParams{
+		ChatID: chatID,
+		Action: models.ChatAction(domain.Typing),
+	}).Return(true, nil).Times(2)
+
+	go func() {
+		sender.SendChatAction(ctx, chatID, action)
+	}()
+
+	// Wait to let it tick at least 2 times
+	time.Sleep(2 * ChatActionRepeatSeconds * time.Second)
+	cancel() // stop goroutine
+
+	// Give time for goroutine to exit
+	time.Sleep(20 * time.Millisecond)
+
+	count := len(mb.Calls)
+	if count < 2 {
+		t.Errorf("expected at least 3 chat actions sent, got %d", count)
 	}
 }

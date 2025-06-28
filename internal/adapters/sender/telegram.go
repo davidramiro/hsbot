@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"hsbot/internal/core/domain"
-	"time"
-
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
+	"hsbot/internal/core/domain"
+	"time"
 )
 
 const TelegramMessageLimit = 4096
@@ -99,13 +98,6 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 	log.Debug().Int64("chatID", chatID).Msg("starting action routine")
 
 	for {
-		select {
-		case <-ctx.Done():
-			log.Debug().Int64("chatID", chatID).Msg("done, stopping action routine")
-			return
-		default:
-		}
-
 		var chatAction models.ChatAction
 		switch action {
 		case domain.SendingPhoto:
@@ -127,7 +119,12 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 			return
 		}
 
-		time.Sleep(ChatActionRepeatSeconds * time.Second)
+		select {
+		case <-ctx.Done():
+			log.Debug().Int64("chatID", chatID).Msg("done, stopping action routine")
+			return
+		case <-time.After(ChatActionRepeatSeconds * time.Second):
+		}
 	}
 }
 
