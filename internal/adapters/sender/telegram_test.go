@@ -236,14 +236,15 @@ func TestSendChatAction_RepeatsAndStopsOnContextCancel(t *testing.T) {
 
 	// Use a channel to track calls deterministically
 	callCh := make(chan struct{}, 10)
-	mb.On("SendChatAction", mock.Anything, mock.Anything).Return(true, nil).Run(func(args mock.Arguments) {
-		callCh <- struct{}{}
-	})
+	mb.On("SendChatAction", mock.Anything, mock.Anything).Twice().Return(true, nil).
+		Run(func(_ mock.Arguments) {
+			callCh <- struct{}{}
+		})
 
 	go sender.SendChatAction(ctx, chatID, action)
 
 	// Wait for a few calls, then cancel
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		select {
 		case <-callCh:
 			// expected

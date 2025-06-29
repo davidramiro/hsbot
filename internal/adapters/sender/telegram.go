@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hsbot/internal/core/domain"
+	"time"
+
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
-	"hsbot/internal/core/domain"
-	"time"
 )
 
 const TelegramMessageLimit = 4096

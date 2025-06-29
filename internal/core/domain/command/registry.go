@@ -60,7 +60,6 @@ func ParseCommandArgs(args string) string {
 		return ""
 	}
 	return args[idx+1:]
-
 }
 
 // ParseCommand extracts the primary command from the input string, discarding arguments and handle, returning it in lowercase.
