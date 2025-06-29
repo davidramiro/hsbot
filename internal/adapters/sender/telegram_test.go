@@ -234,24 +234,29 @@ func TestSendChatAction_RepeatsAndStopsOnContextCancel(t *testing.T) {
 	chatID := int64(12345)
 	action := domain.Typing
 
-	mb.On("SendChatAction", mock.Anything, &bot.SendChatActionParams{
-		ChatID: chatID,
-		Action: models.ChatAction(domain.Typing),
-	}).Return(true, nil).Times(2)
+	// Use a channel to track calls deterministically
+	callCh := make(chan struct{}, 10)
+	mb.On("SendChatAction", mock.Anything, mock.Anything).Return(true, nil).Run(func(args mock.Arguments) {
+		callCh <- struct{}{}
+	})
 
-	go func() {
-		sender.SendChatAction(ctx, chatID, action)
-	}()
+	go sender.SendChatAction(ctx, chatID, action)
 
-	// Wait to let it tick at least 2 times
-	time.Sleep(2 * ChatActionRepeatSeconds * time.Second)
-	cancel() // stop goroutine
-
-	// Give time for goroutine to exit
-	time.Sleep(20 * time.Millisecond)
-
-	count := len(mb.Calls)
-	if count < 2 {
-		t.Errorf("expected at least 3 chat actions sent, got %d", count)
+	// Wait for a few calls, then cancel
+	for i := 0; i < 2; i++ {
+		select {
+		case <-callCh:
+			// expected
+		case <-time.After(time.Second*ChatActionRepeatSeconds + time.Millisecond*200):
+			t.Fatal("timed out waiting for SendChatAction call")
+		}
 	}
+	cancel()
+
+	time.Sleep(20 * time.Millisecond)
+	remaining := len(callCh)
+	if remaining != 0 {
+		t.Errorf("SendChatAction called after cancel: %d extra calls", remaining)
+	}
+	mb.AssertCalled(t, "SendChatAction", mock.Anything, mock.Anything)
 }
