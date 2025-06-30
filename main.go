@@ -71,14 +71,9 @@ func initHandlers(t *sender.Telegram) *command.Registry {
 		viper.GetString("fal.whisper_url"),
 		viper.GetString("fal.api_key"))
 
-	convoTimeout, err := time.ParseDuration(viper.GetString("chat.context_timeout"))
-	if err != nil {
-		log.Panic().Err(err).Msg("invalid timeout for chat context in config")
-	}
-
 	registry := &command.Registry{}
 
-	chat, err := command.NewChat(or, t, fal, "/chat", convoTimeout)
+	chat, err := command.NewChat(or, t, fal, "/chat", viper.GetDuration("chat.context_timeout"))
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing chat handler")
 	}
