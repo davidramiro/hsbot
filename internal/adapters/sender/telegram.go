@@ -53,6 +53,8 @@ func (s *Telegram) SendMessageReply(
 		lastSentID = sent.ID
 	}
 
+	log.Debug().Int64("chatID", message.ChatID).Str("text", text).Msg("sent reply")
+
 	return lastSentID, nil
 }
 
@@ -65,6 +67,8 @@ func (s *Telegram) SendImageURLReply(ctx context.Context, message *domain.Messag
 		},
 		Photo: &models.InputFileString{Data: url},
 	}
+
+	log.Debug().Int64("chatID", message.ChatID).Str("url", url).Msg("sent photo reply")
 
 	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
@@ -84,6 +88,8 @@ func (s *Telegram) SendImageFileReply(ctx context.Context, message *domain.Messa
 			ChatID:    message.ChatID,
 		},
 	}
+
+	log.Debug().Int64("chatID", message.ChatID).Int("size", len(file)).Msg("sent photo reply")
 
 	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
@@ -109,7 +115,7 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 			chatAction = models.ChatActionTyping
 		}
 
-		log.Debug().Int64("chatID", chatID).Str("chatAction", string(chatAction)).
+		log.Trace().Int64("chatID", chatID).Str("chatAction", string(chatAction)).
 			Msg("transmitting action")
 		_, err := s.bot.SendChatAction(ctx, &bot.SendChatActionParams{
 			ChatID: chatID,
@@ -122,7 +128,7 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 
 		select {
 		case <-ctx.Done():
-			log.Debug().Int64("chatID", chatID).Msg("done, stopping action routine")
+			log.Trace().Int64("chatID", chatID).Msg("done, stopping action routine")
 			return
 		case <-time.After(ChatActionRepeatSeconds * time.Second):
 		}

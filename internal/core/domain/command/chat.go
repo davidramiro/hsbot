@@ -83,7 +83,12 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 		Str("func", "Respond").
 		Logger()
 
-	l.Info().Msg("handling request")
+	l.Debug().Str("prompt", message.Text).
+		Str("quoted", message.QuotedText).
+		Str("image", message.ImageURL).
+		Str("audio", message.AudioURL).
+		Str("username", message.Username).
+		Msg("handling request")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -136,7 +141,6 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 		return c.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	l.Debug().Msg("reply generated")
 	conversation.messages = append(conversation.messages,
 		domain.Prompt{Author: domain.System, Prompt: response.Response})
 

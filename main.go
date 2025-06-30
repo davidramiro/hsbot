@@ -107,8 +107,8 @@ func initLogger() {
 	var logLevel zerolog.Level
 
 	switch viper.GetString("bot.log_level") {
-	case "info":
-		logLevel = zerolog.InfoLevel
+	case "trace":
+		logLevel = zerolog.TraceLevel
 	case "debug":
 		logLevel = zerolog.DebugLevel
 	default:

@@ -49,10 +49,6 @@ func (d *Debug) Respond(ctx context.Context, _ time.Duration, message *domain.Me
 
 	metrics.Read(data)
 
-	for _, sample := range data {
-		log.Info().Str("name", sample.Name).Msgf("%d", sample.Value.Uint64())
-	}
-
 	l.Info().Msg("handling request")
 
 	var goos, goarch string
