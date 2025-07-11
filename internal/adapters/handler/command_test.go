@@ -3,13 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"hsbot/internal/core/port"
 	"testing"
 	"time"
 
 	"hsbot/internal/core/domain"
 
-	"github.com/go-telegram/bot/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -184,30 +185,30 @@ func TestCommandHandler_Handle(t *testing.T) {
 func Test_findMediumSizedImage(t *testing.T) {
 	tests := []struct {
 		name   string
-		photos []models.PhotoSize
+		photos []gotgbot.PhotoSize
 		want   string
 	}{
 		{
 			name: "returns medium-sized photo if present",
-			photos: []models.PhotoSize{
-				{FileID: "id1", FileSize: 12000},
-				{FileID: "id2", FileSize: 100000}, // medium
-				{FileID: "id3", FileSize: 150000},
+			photos: []gotgbot.PhotoSize{
+				{FileId: "id1", FileSize: 12000},
+				{FileId: "id2", FileSize: 100000}, // medium
+				{FileId: "id3", FileSize: 150000},
 			},
 			want: "id2",
 		},
 		{
 			name: "falls back to last photo if none matched",
-			photos: []models.PhotoSize{
-				{FileID: "only", FileSize: 10},
-				{FileID: "last", FileSize: 20},
+			photos: []gotgbot.PhotoSize{
+				{FileId: "only", FileSize: 10},
+				{FileId: "last", FileSize: 20},
 			},
 			want: "last",
 		},
 		{
 			name: "single photo fallback",
-			photos: []models.PhotoSize{
-				{FileID: "only", FileSize: 10},
+			photos: []gotgbot.PhotoSize{
+				{FileId: "only", FileSize: 10},
 			},
 			want: "only",
 		},
@@ -224,24 +225,24 @@ func Test_findMediumSizedImage(t *testing.T) {
 func Test_getUserNameFromMessage(t *testing.T) {
 	tests := []struct {
 		name     string
-		user     *models.User
+		user     *gotgbot.User
 		expected string
 	}{
 		{
 			name:     "username present",
-			user:     &models.User{Username: "alice", FirstName: "Alice"},
+			user:     &gotgbot.User{Username: "alice", FirstName: "Alice"},
 			expected: "@alice",
 		},
 		{
 			name:     "empty username, fallback to first name",
-			user:     &models.User{Username: "", FirstName: "Bob"},
+			user:     &gotgbot.User{Username: "", FirstName: "Bob"},
 			expected: "Bob",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, getUserNameFromMessage(tc.user))
+			assert.Equal(t, tc.expected, getUserNameOrFirstName(&ext.Context{EffectiveUser: tc.user}))
 		})
 	}
 }

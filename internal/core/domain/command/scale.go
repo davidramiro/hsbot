@@ -31,7 +31,7 @@ func (s *Scale) GetCommand() string {
 
 func (s *Scale) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("command", s.GetCommand()).
 		Logger()

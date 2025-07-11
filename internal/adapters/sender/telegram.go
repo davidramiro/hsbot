@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/go-telegram/bot/models"
 	"hsbot/internal/core/domain"
+	"hsbot/internal/core/port"
 	"time"
 
-	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,41 +17,41 @@ const TelegramMessageLimit = 4096
 
 // TelegramBotAPI is a wrapper interface for all the used methods of the *bot.Bot struct. Used for mocking in tests.
 type TelegramBotAPI interface {
-	SendMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error)
-	SendPhoto(ctx context.Context, params *bot.SendPhotoParams) (*models.Message, error)
-	SendChatAction(ctx context.Context, params *bot.SendChatActionParams) (bool, error)
+	SendMessageWithContext(ctx context.Context, chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error)
+	SendPhotoWithContext(ctx context.Context, chatId int64, photo gotgbot.InputFileOrString, opts *gotgbot.SendPhotoOpts) (*gotgbot.Message, error)
+	SendChatActionWithContext(ctx context.Context, chatId int64, action string, opts *gotgbot.SendChatActionOpts) (bool, error)
 }
 
 type Telegram struct {
-	bot TelegramBotAPI
+	b TelegramBotAPI
 }
 
 func NewTelegram(bot TelegramBotAPI) *Telegram {
-	return &Telegram{bot: bot}
+	return &Telegram{b: bot}
 }
+
+var _ port.TextSender = (*Telegram)(nil)
 
 func (s *Telegram) SendMessageReply(
 	ctx context.Context,
 	message *domain.Message,
-	text string) (int, error) {
+	text string) (int64, error) {
 	replies := (len(text) + TelegramMessageLimit - 1) / TelegramMessageLimit
-	lastSentID := -1
+	var lastSentID int64
 
 	for i := range replies {
 		substr := text[i*TelegramMessageLimit : min(len(text), (i+1)*TelegramMessageLimit)]
-		sent, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: message.ChatID,
-			Text:   substr,
-			ReplyParameters: &models.ReplyParameters{
-				MessageID: message.ID,
-				ChatID:    message.ChatID,
+		sent, err := s.b.SendMessageWithContext(ctx, message.ChatID, substr, &gotgbot.SendMessageOpts{
+			ReplyParameters: &gotgbot.ReplyParameters{
+				MessageId: message.ID,
+				ChatId:    message.ChatID,
 			},
 		})
 		if err != nil {
 			return -1, fmt.Errorf("failed to send message: %w", err)
 		}
 
-		lastSentID = sent.ID
+		lastSentID = sent.MessageId
 	}
 
 	log.Debug().Int64("chatID", message.ChatID).Str("text", text).Msg("sent reply")
@@ -59,42 +60,39 @@ func (s *Telegram) SendMessageReply(
 }
 
 func (s *Telegram) SendImageURLReply(ctx context.Context, message *domain.Message, url string) error {
-	params := &bot.SendPhotoParams{
-		ChatID: message.ChatID,
-		ReplyParameters: &models.ReplyParameters{
-			MessageID: message.ID,
-			ChatID:    message.ChatID,
+	_, err := s.b.SendPhotoWithContext(ctx, message.ChatID, gotgbot.InputFileByURL(url), &gotgbot.SendPhotoOpts{
+		ReplyParameters: &gotgbot.ReplyParameters{
+			MessageId:                message.ID,
+			ChatId:                   message.ChatID,
+			AllowSendingWithoutReply: true,
 		},
-		Photo: &models.InputFileString{Data: url},
-	}
-
-	log.Debug().Int64("chatID", message.ChatID).Str("url", url).Msg("sent photo reply")
-
-	_, err := s.bot.SendPhoto(ctx, params)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to send image: %w", err)
 	}
+
+	log.Debug().Int64("chatID", message.ChatID).Str("url", url).Msg("sent photo reply")
 
 	return nil
 }
 
 func (s *Telegram) SendImageFileReply(ctx context.Context, message *domain.Message, file []byte) error {
-	params := &bot.SendPhotoParams{
-		ChatID: message.ChatID,
-		Photo: &models.InputFileUpload{Filename: fmt.Sprintf("%d.png", message.ID),
-			Data: bytes.NewReader(file)},
-		ReplyParameters: &models.ReplyParameters{
-			MessageID: message.ID,
-			ChatID:    message.ChatID,
+
+	f := gotgbot.InputFileByReader(fmt.Sprintf("%d", message.ID), bytes.NewReader(file))
+
+	_, err := s.b.SendPhotoWithContext(ctx, message.ChatID, f, &gotgbot.SendPhotoOpts{
+		ReplyParameters: &gotgbot.ReplyParameters{
+			MessageId:                message.ID,
+			ChatId:                   message.ChatID,
+			AllowSendingWithoutReply: true,
 		},
-	}
+	})
 
-	log.Debug().Int64("chatID", message.ChatID).Int("size", len(file)).Msg("sent photo reply")
-
-	_, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to send image: %w", err)
 	}
+
+	log.Debug().Int64("chatID", message.ChatID).Int("size", len(file)).Msg("sent photo reply")
 
 	return nil
 }
@@ -117,10 +115,8 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 
 		log.Trace().Int64("chatID", chatID).Str("chatAction", string(chatAction)).
 			Msg("transmitting action")
-		_, err := s.bot.SendChatAction(ctx, &bot.SendChatActionParams{
-			ChatID: chatID,
-			Action: chatAction,
-		})
+
+		_, err := s.b.SendChatActionWithContext(ctx, chatID, string(action), nil)
 		if err != nil {
 			log.Err(err).Msg("error sending chat action")
 			return

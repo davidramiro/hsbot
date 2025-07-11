@@ -2,13 +2,15 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/domain/command"
 	"hsbot/internal/core/port"
 	"time"
 
-	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,59 +23,53 @@ func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration) *Co
 	return &Command{commandRegistry: commandRegistry, timeout: timeout}
 }
 
-func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message == nil {
-		return
+func (c *Command) Handle(b *gotgbot.Bot, ctx *ext.Context) error {
+	if ctx.EffectiveMessage == nil {
+		return errors.New("no message")
 	}
 
-	if update.Message.Photo != nil {
-		update.Message.Text = update.Message.Caption
+	if ctx.EffectiveMessage.Photo != nil {
+		ctx.EffectiveMessage.Text = ctx.EffectiveMessage.Caption
 	}
 
-	log.Debug().Str("message", update.Message.Text).Msg("received command")
+	log.Debug().Str("message", ctx.EffectiveMessage.Text).Msg("received command")
 
-	cmd := command.ParseCommand(update.Message.Text)
+	cmd := command.ParseCommand(ctx.EffectiveMessage.Text)
 	commandHandler, err := c.commandRegistry.Get(cmd)
 	if err != nil {
 		log.Debug().Str("command", cmd).Msg("no handler for command")
-		return
+		return fmt.Errorf("no handler for command: %w", err)
 	}
 
-	replyToMessageID := new(int)
 	var quotedText string
 	var isReplyToBot bool
 	var replyToUsername string
+	var replyToMessageID int64
 
-	if update.Message.ReplyToMessage != nil {
-		botUser, err := b.GetMe(ctx)
-		if err != nil {
-			log.Err(err).Str("command", cmd).Msg("failed to get bot user")
-			return
-		}
-		if update.Message.ReplyToMessage.From.ID == botUser.ID {
+	if ctx.EffectiveMessage.ReplyToMessage != nil {
+
+		if ctx.EffectiveMessage.ReplyToMessage.From.Id == ctx.Bot.Id {
 			isReplyToBot = true
-			quotedText = update.Message.ReplyToMessage.Text
+			quotedText = ctx.EffectiveMessage.ReplyToMessage.Text
 		} else {
-			replyToUsername = update.Message.ReplyToMessage.From.Username
-			quotedText = update.Message.ReplyToMessage.Text
+			replyToUsername = ctx.EffectiveMessage.ReplyToMessage.From.Username
+			quotedText = ctx.EffectiveMessage.ReplyToMessage.Text
 		}
-
-		*replyToMessageID = update.Message.ReplyToMessage.ID
 	}
 
 	imageURL := make(chan string)
 	audioURL := make(chan string)
 
-	go getOptionalImage(ctx, b, update, imageURL)
-	go getOptionalAudio(ctx, b, update, audioURL)
+	go getOptionalImage(ctx, b, imageURL)
+	go getOptionalAudio(ctx, b, audioURL)
 
 	go func() {
-		err := commandHandler.Respond(ctx, c.timeout, &domain.Message{
-			ID:               update.Message.ID,
-			ChatID:           update.Message.Chat.ID,
-			Text:             update.Message.Text,
-			Username:         getUserNameFromMessage(update.Message.From),
-			ReplyToMessageID: replyToMessageID,
+		err := commandHandler.Respond(context.Background(), c.timeout, &domain.Message{
+			ID:               ctx.EffectiveMessage.MessageId,
+			ChatID:           ctx.EffectiveChat.Id,
+			Text:             ctx.EffectiveMessage.Text,
+			Username:         getUserNameOrFirstName(ctx.EffectiveUser),
+			ReplyToMessageID: &replyToMessageID,
 			ReplyToUsername:  replyToUsername,
 			IsReplyToBot:     isReplyToBot,
 			QuotedText:       quotedText,
@@ -83,20 +79,23 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 		if err != nil {
 			log.Err(err).Str("command", cmd).Msg("failed to respond to command")
 		}
+
 	}()
+
+	return nil
 }
 
-func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
-	var photos []models.PhotoSize
+func getOptionalImage(ctx *ext.Context, b *gotgbot.Bot, url chan<- string) {
+	var photos []gotgbot.PhotoSize
 
-	if update.Message.Photo != nil {
-		photos = update.Message.Photo
+	if ctx.EffectiveMessage.ReplyToMessage != nil {
+		if ctx.EffectiveMessage.ReplyToMessage.Photo != nil {
+			photos = ctx.EffectiveMessage.ReplyToMessage.Photo
+		}
 	}
 
-	if update.Message.ReplyToMessage != nil {
-		if update.Message.ReplyToMessage.Photo != nil {
-			photos = update.Message.ReplyToMessage.Photo
-		}
+	if ctx.EffectiveMessage.Photo != nil {
+		photos = ctx.EffectiveMessage.Photo
 	}
 
 	if len(photos) == 0 {
@@ -104,30 +103,31 @@ func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, ur
 		return
 	}
 
-	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: findMediumSizedImage(photos)})
+	f, err := b.GetFile(findMediumSizedImage(photos), nil)
 	if err != nil {
 		log.Error().Msg("error getting file from telegram api")
 		url <- ""
 		return
 	}
 
-	url <- b.FileDownloadLink(f)
+	url <- f.URL(b, nil)
 }
 
-func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
+func getOptionalAudio(ctx *ext.Context, b *gotgbot.Bot, url chan<- string) {
 	var fileID string
-	if update.Message.Audio != nil {
-		fileID = update.Message.Audio.FileID
+
+	if ctx.EffectiveMessage.ReplyToMessage != nil {
+		if ctx.EffectiveMessage.ReplyToMessage.Voice != nil {
+			fileID = ctx.EffectiveMessage.ReplyToMessage.Voice.FileId
+		}
+
+		if ctx.EffectiveMessage.ReplyToMessage.Audio != nil {
+			fileID = ctx.EffectiveMessage.ReplyToMessage.Audio.FileId
+		}
 	}
 
-	if update.Message.ReplyToMessage != nil {
-		if update.Message.ReplyToMessage.Voice != nil {
-			fileID = update.Message.ReplyToMessage.Voice.FileID
-		}
-
-		if update.Message.ReplyToMessage.Audio != nil {
-			fileID = update.Message.ReplyToMessage.Audio.FileID
-		}
+	if ctx.EffectiveMessage.Audio != nil {
+		fileID = ctx.EffectiveMessage.Audio.FileId
 	}
 
 	if fileID == "" {
@@ -135,30 +135,30 @@ func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, ur
 		return
 	}
 
-	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: fileID})
+	f, err := b.GetFile(fileID, nil)
 	if err != nil {
 		log.Error().Msg("error getting file from telegram api")
 		url <- ""
 		return
 	}
 
-	url <- b.FileDownloadLink(f)
+	url <- f.URL(b, nil)
 }
 
 const minSize = 80000
 const maxSize = 130000
 
-func findMediumSizedImage(photos []models.PhotoSize) string {
+func findMediumSizedImage(photos []gotgbot.PhotoSize) string {
 	for _, photo := range photos {
 		if photo.FileSize > minSize && photo.FileSize < maxSize {
-			return photo.FileID
+			return photo.FileId
 		}
 	}
 
-	return photos[len(photos)-1].FileID
+	return photos[len(photos)-1].FileId
 }
 
-func getUserNameFromMessage(user *models.User) string {
+func getUserNameOrFirstName(user *gotgbot.User) string {
 	if user.Username == "" {
 		return user.FirstName
 	}

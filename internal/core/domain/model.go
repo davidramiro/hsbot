@@ -15,10 +15,10 @@ type Prompt struct {
 }
 
 type Message struct {
-	ID               int
+	ID               int64
 	ChatID           int64
 	Username         string
-	ReplyToMessageID *int
+	ReplyToMessageID *int64
 	ReplyToUsername  string
 	IsReplyToBot     bool
 	QuotedText       string
@@ -31,7 +31,7 @@ type Action string
 
 const (
 	Typing       Action = "typing"
-	SendingPhoto Action = "sending_photo"
+	SendingPhoto Action = "upload_photo"
 )
 
 type ModelResponse struct {

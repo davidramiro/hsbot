@@ -8,7 +8,7 @@ import (
 type TextSender interface {
 	// SendMessageReply sends a reply to a specified message with the given text and returns the sent message ID and
 	// an error if any.
-	SendMessageReply(ctx context.Context, message *domain.Message, text string) (int, error)
+	SendMessageReply(ctx context.Context, message *domain.Message, text string) (int64, error)
 	// SendChatAction sends a specified chat action (e.g., typing, sending photo) to indicate activity in a given chat.
 	SendChatAction(ctx context.Context, chatID int64, action domain.Action)
 	// NotifyAndReturnError sends an error notification based on the provided message context and returns the error.

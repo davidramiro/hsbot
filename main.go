@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"hsbot/internal/adapters/converter"
 	"hsbot/internal/adapters/generator"
 	"hsbot/internal/adapters/handler"
@@ -11,11 +15,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/go-telegram/bot/models"
-
 	"github.com/rs/zerolog"
 
-	"github.com/go-telegram/bot"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
@@ -30,13 +31,26 @@ func main() {
 
 	initLogger()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	_, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	b, err := initBot()
+	token := viper.GetString("telegram.bot_token")
+
+	b, err := gotgbot.NewBot(token, nil)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
+
+	// Create updater and dispatcher.
+	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
+		// If a handler returns an error, log it and continue going.
+		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
+			log.Err(err).Msg("error handling telegram bot update")
+			return ext.DispatcherActionNoop
+		},
+		MaxRoutines: ext.DefaultMaxRoutines,
+	})
+	updater := ext.NewUpdater(dispatcher, nil)
 
 	t := sender.NewTelegram(b)
 
@@ -49,11 +63,23 @@ func main() {
 
 	commandHandler := handler.NewCommand(registry, handlerTimeout)
 
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
-	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
+	dispatcher.AddHandler(handlers.NewMessage(message.Text, commandHandler.Handle))
 
-	log.Info().Msg("bot listening")
-	b.Start(ctx)
+	// Start receiving updates.
+	err = updater.StartPolling(b, &ext.PollingOpts{
+		DropPendingUpdates: true,
+		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
+			Timeout: 9,
+			RequestOpts: &gotgbot.RequestOpts{
+				Timeout: time.Second * 10,
+			},
+		},
+	})
+	if err != nil {
+		log.Panic().Err(err).Msg("failed to start polling updater")
+	}
+
+	updater.Idle()
 }
 
 func initHandlers(t *sender.Telegram) *command.Registry {
@@ -89,15 +115,6 @@ func initHandlers(t *sender.Telegram) *command.Registry {
 	return registry
 }
 
-func initBot() (*bot.Bot, error) {
-	token := viper.GetString("telegram.bot_token")
-	opts := []bot.Option{
-		bot.WithDefaultHandler(noOpHandler),
-	}
-
-	return bot.New(token, opts...)
-}
-
 func initLogger() {
 	var logLevel zerolog.Level
 
@@ -120,5 +137,3 @@ func initConfig() error {
 	log.Info().Msg("reading config file...")
 	return viper.ReadInConfig()
 }
-
-func noOpHandler(_ context.Context, _ *bot.Bot, _ *models.Update) {}

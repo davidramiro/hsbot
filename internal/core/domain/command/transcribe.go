@@ -27,7 +27,7 @@ func (h *Transcribe) GetCommand() string {
 
 func (h *Transcribe) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := log.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("audioURL", message.AudioURL).
 		Str("command", h.GetCommand()).

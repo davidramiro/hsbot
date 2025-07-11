@@ -78,7 +78,7 @@ func (c *Chat) GetCommand() string {
 
 func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
 	l := c.l.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("func", "Respond").
 		Logger()
@@ -160,7 +160,7 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 
 func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation, error) {
 	l := c.l.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("func", "getConversationForMessage").
 		Logger()

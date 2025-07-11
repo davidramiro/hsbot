@@ -3,11 +3,11 @@ package sender
 import (
 	"context"
 	"errors"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 	"hsbot/internal/core/domain"
 	"testing"
 	"time"
 
-	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,18 +17,18 @@ type MockBot struct {
 	mock.Mock
 }
 
-func (m *MockBot) SendMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error) {
-	args := m.Called(ctx, params)
-	msg, _ := args.Get(0).(*models.Message)
+func (m *MockBot) SendMessageWithContext(ctx context.Context, chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+	args := m.Called(ctx, chatId, text, opts)
+	msg, _ := args.Get(0).(*gotgbot.Message)
 	return msg, args.Error(1)
 }
-func (m *MockBot) SendPhoto(ctx context.Context, params *bot.SendPhotoParams) (*models.Message, error) {
-	args := m.Called(ctx, params)
-	msg, _ := args.Get(0).(*models.Message)
+func (m *MockBot) SendPhotoWithContext(ctx context.Context, chatId int64, photo gotgbot.InputFileOrString, opts *gotgbot.SendPhotoOpts) (*gotgbot.Message, error) {
+	args := m.Called(ctx, chatId, photo, opts)
+	msg, _ := args.Get(0).(*gotgbot.Message)
 	return msg, args.Error(1)
 }
-func (m *MockBot) SendChatAction(ctx context.Context, params *bot.SendChatActionParams) (bool, error) {
-	args := m.Called(ctx, params)
+func (m *MockBot) SendChatActionWithContext(ctx context.Context, chatId int64, action string, opts *gotgbot.SendChatActionOpts) (bool, error) {
+	args := m.Called(ctx, chatId, action, opts)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -50,10 +50,10 @@ func TestTelegramSender_SendMessageReply(t *testing.T) {
 			text:      "hello",
 			wantCalls: 1,
 			setupMock: func(mb *MockBot) {
-				mb.On("SendMessage", mock.Anything, mock.MatchedBy(func(params *bot.SendMessageParams) bool {
-					return params.Text == "hello"
+				mb.On("SendMessageWithContext", mock.Anything, mock.MatchedBy(func(param string) bool {
+					return param == "hello"
 				})).
-					Return(&models.Message{ID: 123}, nil).
+					Return(&gotgbot.Message{MessageId: 123}, nil).
 					Once()
 			},
 			wantErr: false,
@@ -63,10 +63,10 @@ func TestTelegramSender_SendMessageReply(t *testing.T) {
 			text:      longText,
 			wantCalls: 2,
 			setupMock: func(mb *MockBot) {
-				mb.On("SendMessage", mock.Anything, mock.MatchedBy(func(params *bot.SendMessageParams) bool {
-					return len(params.Text) <= TelegramMessageLimit
+				mb.On("SendMessageWithContext", mock.Anything, mock.MatchedBy(func(param string) bool {
+					return len(param) <= TelegramMessageLimit
 				})).
-					Return(&models.Message{ID: 456}, nil).
+					Return(&gotgbot.Message{MessageId: 456}, nil).
 					Twice()
 			},
 			wantErr: false,
@@ -76,7 +76,8 @@ func TestTelegramSender_SendMessageReply(t *testing.T) {
 			text:      "fail",
 			wantCalls: 1,
 			setupMock: func(mb *MockBot) {
-				mb.On("SendMessage", mock.Anything, mock.Anything).Return(nil, errors.New("fail")).Once()
+				mb.On("SendMessageWithContext", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, errors.New("fail")).Once()
 			},
 			wantErr: true,
 		},
@@ -170,8 +171,8 @@ func TestTelegramSender_SendImageFileReply(t *testing.T) {
 			sender := NewTelegram(mb)
 
 			msg := &domain.Message{ID: 33, ChatID: 44}
-			mb.On("SendPhoto", mock.Anything, mock.Anything).
-				Return(&models.Message{}, tc.retErr).Once()
+			mb.On("SendPhotoWithContext", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(&gotgbot.Message{}, tc.retErr).Once()
 
 			err := sender.SendImageFileReply(t.Context(), msg, tc.file)
 
@@ -211,8 +212,8 @@ func TestTelegramSender_NotifyAndReturnError(t *testing.T) {
 			sender := NewTelegram(mb)
 
 			msg := &domain.Message{ID: 55, ChatID: 88}
-			mb.On("SendMessage", mock.Anything, mock.Anything).
-				Return(&models.Message{ID: 101}, tc.sendMsgRetErr)
+			mb.On("SendMessageWithContext", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(&gotgbot.Message{MessageId: 101}, tc.sendMsgRetErr)
 
 			err := sender.NotifyAndReturnError(t.Context(), tc.originalErr, msg)
 

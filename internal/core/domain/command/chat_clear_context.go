@@ -27,7 +27,7 @@ func (c *ChatClearContext) GetCommand() string {
 
 func (c *ChatClearContext) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
 	l := log.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("command", c.GetCommand()).
 		Logger()

@@ -37,7 +37,7 @@ const metricCount = 3
 
 func (d *Debug) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
 	l := log.With().
-		Int("messageId", message.ID).
+		Int64("messageId", message.ID).
 		Int64("chatId", message.ChatID).
 		Str("command", d.GetCommand()).
 		Logger()
