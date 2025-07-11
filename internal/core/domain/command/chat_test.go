@@ -146,8 +146,9 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 
 	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 
+	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
-	assert.Equal(t, "mock response\n\n--\ndebug: model: unit-test\nc tokens: 24 | total tokens: 42\n"+
+	assert.Equal(t, "debug: model: unit-test\nc tokens: 24 | total tokens: 42\n"+
 		"convo size: 2", ms.Message)
 }
 

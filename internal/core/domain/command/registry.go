@@ -22,7 +22,7 @@ func (r *Registry) Register(handler port.Command) {
 }
 
 func (r *Registry) Get(command string) (port.Command, error) {
-	log.Debug().Interface("command", command).Msg("fetching command handler from registry")
+	log.Trace().Interface("command", command).Msg("fetching command handler from registry")
 
 	if r.commands == nil {
 		err := errors.New("can't fetch command, registry not initialized")

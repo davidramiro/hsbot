@@ -144,15 +144,15 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 	conversation.messages = append(conversation.messages,
 		domain.Prompt{Author: domain.System, Prompt: response.Response})
 
-	if viper.GetBool("bot.debug_replies") {
-		addDebugInfo(&response.Response, response.Metadata, len(conversation.messages))
-	}
-
 	_, err = c.textSender.SendMessageReply(ctx,
 		message,
 		response.Response)
 	if err != nil {
 		return err
+	}
+
+	if viper.GetBool("bot.debug_replies") {
+		go c.sendDebugInfo(message, response.Metadata, len(conversation.messages))
 	}
 
 	return nil
@@ -168,7 +168,7 @@ func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation
 	var conversation *Conversation
 	conv, ok := c.cache.Load(message.ChatID)
 	if !ok {
-		l.Debug().Msg("new conversation")
+		l.Trace().Msg("new conversation")
 
 		c.cache.Store(message.ChatID, &Conversation{
 			chatID:     message.ChatID,
@@ -184,24 +184,30 @@ func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation
 		if !ok {
 			return nil, errors.New("conversation type error")
 		}
-		l.Debug().Msg("existing conversation, stopping timer")
+		l.Trace().Msg("existing conversation, stopping timer")
 		conversation.exitSignal <- struct{}{}
 	}
 	return conversation, nil
 }
 
-func addDebugInfo(response *string, metadata domain.ResponseMetadata, length int) {
-	*response = fmt.Sprintf(`%s
-
---
-debug: model: %s
+func (c *Chat) sendDebugInfo(message *domain.Message, metadata domain.ResponseMetadata, length int) {
+	debug := fmt.Sprintf(`debug: model: %s
 c tokens: %d | total tokens: %d
 convo size: %d`,
-		*response,
 		metadata.Model,
 		metadata.CompletionTokens,
 		metadata.TotalTokens,
 		length)
+
+	ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("chat.context_timeout"))
+	defer cancel()
+
+	_, err := c.textSender.SendMessageReply(ctx,
+		message,
+		debug)
+	if err != nil {
+		log.Warn().Int64("chatID", message.ChatID).Err(err).Msg("failed to send debug info")
+	}
 }
 
 func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
