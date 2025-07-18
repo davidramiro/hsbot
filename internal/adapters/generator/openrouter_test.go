@@ -50,7 +50,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					},
 				}},
 				Model: "openai/gpt-4.1",
-				Usage: openrouter.Usage{
+				Usage: &openrouter.Usage{
 					CompletionTokens: 7,
 					TotalTokens:      9,
 				},
@@ -86,7 +86,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					},
 				}},
 				Model: "openai/gpt-4.1",
-				Usage: openrouter.Usage{
+				Usage: &openrouter.Usage{
 					CompletionTokens: 7,
 					TotalTokens:      9,
 				},
@@ -132,7 +132,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					},
 				}},
 				Model: "openai/gpt-4.1",
-				Usage: openrouter.Usage{
+				Usage: &openrouter.Usage{
 					CompletionTokens: 4,
 					TotalTokens:      10,
 				},
