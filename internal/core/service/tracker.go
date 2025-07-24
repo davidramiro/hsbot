@@ -67,7 +67,9 @@ func (t *UsageTracker) ResetDailyLimit(ctx context.Context) {
 		select {
 		case <-time.After(time.Until(reset)):
 			log.Debug().Msg("resetting daily limit")
+			t.mutex.Lock()
 			t.chats = make(map[int64]float64)
+			t.mutex.Unlock()
 			time.Sleep(time.Second)
 			reset = getNextResetTime()
 		case <-ctx.Done():
