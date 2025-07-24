@@ -14,8 +14,10 @@ func TestEditHandler_Success(t *testing.T) {
 	mg := &MockImageGenerator{imageURL: "http://image.url"}
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	eh := NewEdit(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, ma, mtr, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,
@@ -35,8 +37,10 @@ func TestEditHandler_EmptyPrompt(t *testing.T) {
 	mg := &MockImageGenerator{}
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	eh := NewEdit(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, ma, mtr, "/edit")
 
 	msg := &domain.Message{
 		ID:     1,
@@ -54,8 +58,10 @@ func TestEditHandler_MissingImage(t *testing.T) {
 	mg := &MockImageGenerator{}
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	eh := NewEdit(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, ma, mtr, "/edit")
 
 	msg := &domain.Message{
 		ID:     1,
@@ -73,8 +79,10 @@ func TestEditHandler_EditFromPromptError(t *testing.T) {
 	mg := &MockImageGenerator{err: errors.New("gen-failed")}
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	eh := NewEdit(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, ma, mtr, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,
@@ -93,8 +101,10 @@ func TestEditHandler_SendImageURLReplyError(t *testing.T) {
 	mg := &MockImageGenerator{imageURL: "http://image.url"}
 	ms := &MockImageSender{err: errors.New("send-failed")}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	eh := NewEdit(mg, ms, mt, "/edit")
+	eh := NewEdit(mg, ms, mt, ma, mtr, "/edit")
 
 	msg := &domain.Message{
 		ID:       1,

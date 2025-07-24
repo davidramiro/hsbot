@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
+	"hsbot/internal/core/service"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/rs/zerolog/log"
 )
@@ -15,16 +18,24 @@ type Edit struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
+	auth           service.Authorizer
+	track          service.Tracker
+	cost           float64
 	command        string
 }
 
 func NewEdit(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
+	auth service.Authorizer,
+	track service.Tracker,
 	command string) *Edit {
 	return &Edit{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
+		cost:        viper.GetFloat64("fal.image_edit_cost"),
+		track:       track,
+		auth:        auth,
 		command:     command}
 }
 
@@ -45,6 +56,16 @@ func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *doma
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	if !e.auth.IsAuthorized(ctx, message.ChatID) {
+		l.Debug().Msg("not authorized")
+		return nil
+	}
+
+	if !e.track.CheckLimit(ctx, message.ChatID) {
+		l.Debug().Msg("spend limit reached")
+		return nil
+	}
+
 	go e.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
 
 	prompt := ParseCommandArgs(message.Text)
@@ -63,6 +84,8 @@ func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *doma
 		err = fmt.Errorf("error creating edited image: %w", err)
 		return e.textSender.NotifyAndReturnError(ctx, err, message)
 	}
+
+	e.track.AddCost(message.ChatID, e.cost)
 
 	err = e.imageSender.SendImageURLReply(ctx, message, imageURL)
 	if err != nil {

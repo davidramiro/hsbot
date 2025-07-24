@@ -48,4 +48,5 @@ type ResponseMetadata struct {
 	Model            string
 	CompletionTokens int
 	TotalTokens      int
+	Cost             float64
 }

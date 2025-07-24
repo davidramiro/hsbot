@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
+	"hsbot/internal/core/service"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,8 @@ type Chat struct {
 	cache         *sync.Map
 	models        []domain.Model
 	defaultModel  domain.Model
+	auth          service.Authorizer
+	track         service.Tracker
 	l             *zerolog.Logger
 }
 
@@ -36,8 +39,17 @@ type Conversation struct {
 	chatID     int64
 }
 
-func NewChat(textGenerator port.TextGenerator, textSender port.TextSender, transcriber port.Transcriber,
-	command string, cacheDuration time.Duration) (*Chat, error) {
+type ChatParams struct {
+	TextGenerator port.TextGenerator
+	TextSender    port.TextSender
+	Transcriber   port.Transcriber
+	Command       string
+	CacheDuration time.Duration
+	Auth          service.Authorizer
+	Track         service.Tracker
+}
+
+func NewChat(p ChatParams) (*Chat, error) {
 	var models []domain.Model
 	err := viper.UnmarshalKey("openrouter.models", &models)
 	if err != nil {
@@ -53,19 +65,21 @@ func NewChat(textGenerator port.TextGenerator, textSender port.TextSender, trans
 	}
 
 	logger := log.With().
-		Str("command", command).
+		Str("command", p.Command).
 		Str("handler", "chat").
 		Logger()
 
 	h := &Chat{
-		textGenerator: textGenerator,
-		textSender:    textSender,
-		transcriber:   transcriber,
-		cacheDuration: cacheDuration,
-		command:       command,
+		textGenerator: p.TextGenerator,
+		textSender:    p.TextSender,
+		transcriber:   p.Transcriber,
+		cacheDuration: p.CacheDuration,
+		command:       p.Command,
 		cache:         &sync.Map{},
 		models:        models,
 		defaultModel:  model,
+		auth:          p.Auth,
+		track:         p.Track,
 		l:             &logger,
 	}
 
@@ -92,6 +106,16 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	if !c.auth.IsAuthorized(ctx, message.ChatID) {
+		l.Debug().Msg("not authorized")
+		return nil
+	}
+
+	if !c.track.CheckLimit(ctx, message.ChatID) {
+		l.Debug().Msg("spend limit reached")
+		return nil
+	}
 
 	go c.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
@@ -140,6 +164,8 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
 		return c.textSender.NotifyAndReturnError(ctx, err, message)
 	}
+
+	c.track.AddCost(message.ChatID, response.Metadata.Cost)
 
 	conversation.messages = append(conversation.messages,
 		domain.Prompt{Author: domain.System, Prompt: response.Response})
@@ -193,11 +219,12 @@ func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation
 func (c *Chat) sendDebugInfo(message *domain.Message, metadata domain.ResponseMetadata, length int) {
 	debug := fmt.Sprintf(`debug: model: %s
 c tokens: %d | total tokens: %d
-convo size: %d`,
+convo size: %d | cost: %f`,
 		metadata.Model,
 		metadata.CompletionTokens,
 		metadata.TotalTokens,
-		length)
+		length,
+		metadata.Cost)
 
 	ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("chat.context_timeout"))
 	defer cancel()

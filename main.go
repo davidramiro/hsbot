@@ -7,6 +7,7 @@ import (
 	"hsbot/internal/adapters/handler"
 	"hsbot/internal/adapters/sender"
 	"hsbot/internal/core/domain/command"
+	"hsbot/internal/core/service"
 	"os"
 	"os/signal"
 	"time"
@@ -40,7 +41,7 @@ func main() {
 
 	t := sender.NewTelegram(b)
 
-	registry := initHandlers(t)
+	registry := initHandlers(ctx, t)
 
 	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
 	if err != nil {
@@ -56,7 +57,7 @@ func main() {
 	b.Start(ctx)
 }
 
-func initHandlers(t *sender.Telegram) *command.Registry {
+func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	or := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
 
@@ -73,15 +74,31 @@ func initHandlers(t *sender.Telegram) *command.Registry {
 
 	registry := &command.Registry{}
 
-	chat, err := command.NewChat(or, t, fal, "/chat", viper.GetDuration("chat.context_timeout"))
+	auth, err := service.NewAuthorizer(t)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed initializing authorizer")
+	}
+
+	track := service.NewUsageTracker(ctx, t)
+
+	chat, err := command.NewChat(command.ChatParams{
+		TextGenerator: or,
+		TextSender:    t,
+		Transcriber:   fal,
+		Command:       "/chat",
+		CacheDuration: viper.GetDuration("chat.context_timeout"),
+		Auth:          auth,
+		Track:         track,
+	})
+
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing chat handler")
 	}
 
 	registry.Register(chat)
 	registry.Register(command.NewModels(chat, t, "/models"))
-	registry.Register(command.NewImage(fal, t, t, "/image"))
-	registry.Register(command.NewEdit(fal, t, t, "/edit"))
+	registry.Register(command.NewImage(fal, t, t, auth, track, "/image"))
+	registry.Register(command.NewEdit(fal, t, t, auth, track, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
 	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
