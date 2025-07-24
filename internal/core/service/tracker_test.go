@@ -43,7 +43,7 @@ func TestAddCost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tracker.chats[tt.chatID] = tt.initialCost
 			tracker.AddCost(tt.chatID, tt.addCost)
-			assert.Equal(t, tt.wantTotal, tracker.chats[tt.chatID])
+			assert.InDelta(t, tt.wantTotal, tracker.chats[tt.chatID], 0.01)
 		})
 	}
 }
@@ -97,7 +97,7 @@ func TestCheckLimit(t *testing.T) {
 				dailyLimit: dailyLimit,
 				sender:     mockSender,
 			}
-			ctx := context.Background()
+			ctx := t.Context()
 			result := tracker.CheckLimit(ctx, tt.chatID)
 			assert.Equal(t, tt.expectAllowed, result)
 			if tt.expectMessage {
@@ -118,14 +118,14 @@ func TestNewUsageTracker(t *testing.T) {
 	dailyLimit := 10.00
 	viper.Set("telegram.daily_spend_limit", dailyLimit)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	mockSender := &mockTextSender{}
 	tracker := NewUsageTracker(ctx, mockSender)
 
 	assert.NotNil(t, tracker.chats)
-	assert.Equal(t, dailyLimit, tracker.dailyLimit)
+	assert.InDelta(t, dailyLimit, tracker.dailyLimit, 0.01)
 	assert.Equal(t, mockSender, tracker.sender)
 }
 

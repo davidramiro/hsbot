@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"hsbot/internal/core/domain"
 
 	"github.com/spf13/viper"
@@ -18,11 +20,11 @@ type mockTextSender struct {
 	sendError   error
 }
 
-func (m *mockTextSender) SendChatAction(ctx context.Context, chatID int64, action domain.Action) {
+func (m *mockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {
 	panic("implement me")
 }
 
-func (m *mockTextSender) NotifyAndReturnError(ctx context.Context, err error, message *domain.Message) error {
+func (m *mockTextSender) NotifyAndReturnError(_ context.Context, _ error, _ *domain.Message) error {
 	panic("implement me")
 }
 
@@ -76,10 +78,10 @@ func TestNewAuthorizer(t *testing.T) {
 			auth, err := NewAuthorizer(&mockTextSender{})
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, auth)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, auth)
 				assert.Equal(t, tt.expected, auth.allowlist)
 			}
@@ -134,7 +136,7 @@ func TestChatAuthorizer_IsAuthorized(t *testing.T) {
 				sender:    mockSender,
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			got := a.IsAuthorized(ctx, tt.chatID)
 
 			assert.Equal(t, tt.want, got)
