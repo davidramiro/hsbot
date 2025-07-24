@@ -103,6 +103,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
 	registry.Register(command.NewDebug(t, "/debug"))
+	registry.Register(command.NewSpent(track, t, "/spent"))
 	return registry
 }
 

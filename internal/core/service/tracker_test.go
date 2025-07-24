@@ -14,7 +14,7 @@ import (
 func TestAddCost(t *testing.T) {
 	tracker := &UsageTracker{
 		chats: make(map[int64]float64),
-		mutex: &sync.Mutex{},
+		mutex: sync.Mutex{},
 	}
 	tests := []struct {
 		name        string
@@ -93,7 +93,7 @@ func TestCheckLimit(t *testing.T) {
 			mockSender := &mockTextSender{sendError: tt.simulateErr}
 			tracker := &UsageTracker{
 				chats:      map[int64]float64{tt.chatID: tt.spent},
-				mutex:      &sync.Mutex{},
+				mutex:      sync.Mutex{},
 				dailyLimit: dailyLimit,
 				sender:     mockSender,
 			}
@@ -136,4 +136,49 @@ func TestGetNextResetTime(t *testing.T) {
 	assert.Equal(t, 0, reset.Minute())
 	assert.Equal(t, 0, reset.Second())
 	assert.Equal(t, now.Day()+1, reset.Day())
+}
+
+func TestGetSpent(t *testing.T) {
+	tracker := &UsageTracker{
+		chats: map[int64]float64{
+			1: 10.5,
+			2: 0.0,
+			3: 99.99,
+		},
+		mutex: sync.Mutex{},
+	}
+
+	tests := []struct {
+		name   string
+		chatID int64
+		want   float64
+	}{
+		{
+			name:   "spent value exists for ID 1",
+			chatID: 1,
+			want:   10.5,
+		},
+		{
+			name:   "zero value exists for ID 2",
+			chatID: 2,
+			want:   0.0,
+		},
+		{
+			name:   "spent value exists for ID 3",
+			chatID: 3,
+			want:   99.99,
+		},
+		{
+			name:   "spent not set, returns zero",
+			chatID: 999,
+			want:   0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tracker.GetSpent(tt.chatID)
+			assert.InDelta(t, tt.want, got, 0.001)
+		})
+	}
 }

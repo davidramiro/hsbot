@@ -68,6 +68,10 @@ type MockTracker struct {
 	withinLimit bool
 }
 
+func (m MockTracker) GetSpent(_ int64) float64 {
+	return 0.0
+}
+
 func (m MockTracker) AddCost(_ int64, _ float64) {
 }
 

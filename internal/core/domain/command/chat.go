@@ -113,7 +113,7 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 	}
 
 	if !c.track.CheckLimit(ctx, message.ChatID) {
-		l.Debug().Msg("spend limit reached")
+		l.Debug().Msg("spending limit reached")
 		return nil
 	}
 

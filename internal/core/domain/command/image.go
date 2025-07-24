@@ -33,7 +33,7 @@ func NewImage(imageGenerator port.ImageGenerator,
 	return &Image{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
-		cost:        viper.GetFloat64("fal.image_edit_cost"),
+		cost:        viper.GetFloat64("fal.image_gen_cost"),
 		track:       track,
 		auth:        auth,
 		command:     command}
@@ -62,7 +62,7 @@ func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *dom
 	}
 
 	if !i.track.CheckLimit(ctx, message.ChatID) {
-		l.Debug().Msg("spend limit reached")
+		l.Debug().Msg("spending limit reached")
 		return nil
 	}
 

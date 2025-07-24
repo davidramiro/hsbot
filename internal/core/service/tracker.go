@@ -15,12 +15,13 @@ import (
 type Tracker interface {
 	AddCost(chatID int64, cost float64)
 	CheckLimit(ctx context.Context, chatID int64) bool
+	GetSpent(chatID int64) float64
 }
 
 type UsageTracker struct {
 	chats      map[int64]float64
 	dailyLimit float64
-	mutex      *sync.Mutex
+	mutex      sync.Mutex
 	sender     port.TextSender
 }
 
@@ -38,11 +39,11 @@ func NewUsageTracker(ctx context.Context, sender port.TextSender) *UsageTracker 
 
 func (t *UsageTracker) AddCost(chatID int64, cost float64) {
 	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	t.chats[chatID] += cost
-	t.mutex.Unlock()
 }
 
-const overLimit = "You have exceeded your daily spend limit: $%.2f. Limit will reset in %s."
+const overLimit = "You have exceeded your daily spending limit: $%.2f. Limit will reset in %s."
 
 func (t *UsageTracker) CheckLimit(ctx context.Context, chatID int64) bool {
 	if t.chats[chatID] > t.dailyLimit {
@@ -79,4 +80,11 @@ func (t *UsageTracker) ResetDailyLimit(ctx context.Context) {
 func getNextResetTime() time.Time {
 	now := time.Now()
 	return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+}
+
+func (t *UsageTracker) GetSpent(chatID int64) float64 {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	return t.chats[chatID]
 }
