@@ -48,8 +48,10 @@ func TestNewImageHandler(t *testing.T) {
 	mg := &MockImageGenerator{}
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, ms, ts, "/image")
+	imageHandler := NewImage(mg, ms, ts, ma, mtr, "/image")
 
 	assert.NotNil(t, imageHandler)
 	assert.Equal(t, "/image", imageHandler.GetCommand())
@@ -57,24 +59,28 @@ func TestNewImageHandler(t *testing.T) {
 
 func TestImageRepondSuccessful(t *testing.T) {
 	mg := &MockImageGenerator{response: "https://example.org/image.png"}
-	mi := &MockImageSender{}
-	mt := &MockTextSender{}
+	ms := &MockImageSender{}
+	ts := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, ms, ts, ma, mtr, "/image")
 
 	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
 	require.NoError(t, err)
 
-	assert.Equal(t, "https://example.org/image.png", mi.calledURL)
+	assert.Equal(t, "https://example.org/image.png", ms.calledURL)
 }
 
 func TestImageRepondSendFailed(t *testing.T) {
 	mg := &MockImageGenerator{response: "https://example.org/image.png"}
 	mi := &MockImageSender{err: errors.New("mock error")}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, ma, mtr, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -85,8 +91,10 @@ func TestImageRepondErrorEmptyPrompt(t *testing.T) {
 	mg := &MockImageGenerator{}
 	mi := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, ma, mtr, "/image")
 
 	err := imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
@@ -99,8 +107,10 @@ func TestImageRepondErrorGenerating(t *testing.T) {
 	mg := &MockImageGenerator{err: errors.New("mock error")}
 	mi := &MockImageSender{}
 	mt := &MockTextSender{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, ma, mtr, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -112,8 +122,10 @@ func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
 	mg := &MockImageGenerator{err: errors.New("mock error")}
 	mi := &MockImageSender{}
 	mt := &MockTextSender{err: errors.New("mock error")}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, ma, mtr, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
@@ -125,8 +137,10 @@ func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
 	mg := &MockImageGenerator{}
 	mi := &MockImageSender{}
 	mt := &MockTextSender{err: errors.New("mock error")}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	imageHandler := NewImage(mg, mi, mt, "/image")
+	imageHandler := NewImage(mg, mi, mt, ma, mtr, "/image")
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})

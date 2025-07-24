@@ -57,7 +57,10 @@ func (c *OpenRouter) GenerateFromPrompt(
 
 	ccr := openrouter.ChatCompletionRequest{
 		Messages: messages,
-		Model:    prompts[len(prompts)-1].Model.Identifier,
+		Usage: &openrouter.IncludeUsage{
+			Include: true,
+		},
+		Model: prompts[len(prompts)-1].Model.Identifier,
 	}
 
 	resp, err := c.client.CreateChatCompletion(ctx, ccr)
@@ -71,6 +74,7 @@ func (c *OpenRouter) GenerateFromPrompt(
 			Model:            resp.Model,
 			CompletionTokens: resp.Usage.CompletionTokens,
 			TotalTokens:      resp.Usage.TotalTokens,
+			Cost:             resp.Usage.Cost,
 		},
 	}, nil
 }

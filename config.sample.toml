@@ -1,6 +1,7 @@
 [bot]
 # log level, debug/info
 log_level = "info"
+# send additional debug info for openrouter requests as reply into chat
 debug_replies = false
 
 [chat]
@@ -21,6 +22,12 @@ timeout = "30s"
 
 [telegram]
 bot_token = "4242:telegram-bot-token"
+# admin telegram username for info about getting authorized
+admin_username = "admin_username"
+# authorized telegram chat IDs
+allowed_chat_ids = [ -4242424242, 424242424242 ]
+# daily spending limit in dollars, resets at 00:00 local time
+daily_spend_limit = 1.00
 
 [openrouter]
 api_key = "sk-api-key"
@@ -37,5 +44,9 @@ default_model = { keyword = "claude", identifier = "anthropic/claude-sonnet-4"}
 [fal]
 api_key = "4242:1234"
 image_gen_url = "https://fal.run/fal-ai/imagen3/fast"
+# cost per generated image
+image_gen_cost = 0.025
 whisper_url = "https://fal.run/fal-ai/whisper"
 image_edit_url = "https://fal.run/fal-ai/bagel/edit"
+# cost per edited image
+image_edit_cost = 0.10

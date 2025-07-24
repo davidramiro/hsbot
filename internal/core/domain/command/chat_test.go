@@ -27,6 +27,7 @@ func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Pro
 			Model:            "unit-test",
 			CompletionTokens: 24,
 			TotalTokens:      42,
+			Cost:             0.42,
 		},
 	}, m.err
 }
@@ -55,13 +56,41 @@ func (m *MockTextSender) NotifyAndReturnError(_ context.Context, err error, _ *d
 
 func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {}
 
+type MockAuthorizer struct {
+	auth bool
+}
+
+func (m MockAuthorizer) IsAuthorized(_ context.Context, _ int64) bool {
+	return m.auth
+}
+
+type MockTracker struct {
+	withinLimit bool
+}
+
+func (m MockTracker) AddCost(_ int64, _ float64) {
+}
+
+func (m MockTracker) CheckLimit(_ context.Context, _ int64) bool {
+	return m.withinLimit
+}
+
 func TestChatHandlerSimpleSuccess(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -75,9 +104,18 @@ func TestChatHandlerTranscribeSuccess(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -102,9 +140,18 @@ func TestChatHandlerTranscribeError(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{err: errors.New("foo")}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -119,9 +166,18 @@ func TestChatHandlerErrorEmptyPrompt(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -136,11 +192,20 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
 	viper.SetDefault("bot.debug_replies", true)
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -149,18 +214,27 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
 	assert.Equal(t, "debug: model: unit-test\nc tokens: 24 | total tokens: 42\n"+
-		"convo size: 2", ms.Message)
+		"convo size: 2 | cost: 0.420000", ms.Message)
 }
 
 func TestChatHandlerClearingCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
+
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	viper.SetDefault("bot.debug_replies", false)
-
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -186,11 +260,20 @@ func TestChatHandlerCache(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
+
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	viper.SetDefault("bot.debug_replies", false)
-
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -228,11 +311,20 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
+
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	viper.SetDefault("bot.debug_replies", false)
-
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -277,11 +369,20 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
+
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	viper.SetDefault("bot.debug_replies", false)
-
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
 
 	assert.NotNil(t, chatHandler)
 
@@ -336,9 +437,18 @@ func TestGeneratorError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -352,9 +462,18 @@ func TestEmptyPromptError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -368,9 +487,18 @@ func TestSendMessageError(t *testing.T) {
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
@@ -384,9 +512,18 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 	mg := &MockTextGenerator{err: errors.New("mock error")}
 	ms := &MockTextSender{err: errors.New("mock error")}
 	mt := &MockTranscriber{}
+	ma := &MockAuthorizer{auth: true}
+	mtr := &MockTracker{withinLimit: true}
 
-	chatHandler, _ := NewChat(mg, ms, mt,
-		"/chat", time.Second*3)
+	chatHandler, _ := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Auth:          ma,
+		Track:         mtr,
+	})
 
 	assert.NotNil(t, chatHandler)
 
