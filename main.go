@@ -58,8 +58,11 @@ func main() {
 }
 
 func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
-	or := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
+	or, err := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
+	if err != nil {
+		log.Panic().Err(err).Msg("failed initializing openrouter generator")
+	}
 
 	magick, err := converter.NewMagick()
 	if err != nil {
@@ -96,7 +99,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	}
 
 	registry.Register(chat)
-	registry.Register(command.NewModels(chat, t, "/models"))
+	registry.Register(command.NewModels(or, t, "/models"))
 	registry.Register(command.NewImage(fal, t, t, auth, track, "/image"))
 	registry.Register(command.NewEdit(fal, t, t, auth, track, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))

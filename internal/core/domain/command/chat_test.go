@@ -217,7 +217,7 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 
 	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
-	assert.Equal(t, "debug: model: unit-test\nc tokens: 24 | total tokens: 42\n"+
+	assert.Equal(t, "debug:\nmodel: unit-test | retries: 0\nc tokens: 24 | total tokens: 42\n"+
 		"convo size: 2 | cost: 0.420000", ms.Message)
 }
 
@@ -535,58 +535,4 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 
 	assert.Equal(t, "failed to generate response: mock error", ms.Message)
 	require.Errorf(t, err, "failed to send reply")
-}
-
-func TestFindModelByMessage(t *testing.T) {
-	models := []domain.Model{
-		{Keyword: "gpt"},
-		{Keyword: "claude"},
-	}
-	defaultModel := domain.Model{Keyword: "default"}
-
-	handler := &Chat{
-		models:       models,
-		defaultModel: defaultModel,
-	}
-
-	tests := []struct {
-		name        string
-		message     string
-		wantModel   domain.Model
-		wantMessage string
-	}{
-		{
-			name:        "Match GPT model keyword (case-insensitive)",
-			message:     "Hello #GPT",
-			wantModel:   models[0],
-			wantMessage: "Hello ",
-		},
-		{
-			name:        "Match Claude model keyword",
-			message:     "Please use #claude for this",
-			wantModel:   models[1],
-			wantMessage: "Please use  for this",
-		},
-		{
-			name:        "No keyword, fallback to default",
-			message:     "Just a normal message",
-			wantModel:   defaultModel,
-			wantMessage: "Just a normal message",
-		},
-		{
-			name:        "Multiple keywords, first match is returned",
-			message:     "#gpt and #claude in text",
-			wantModel:   models[0],
-			wantMessage: " and #claude in text",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			msg := tt.message
-			gotModel := handler.findModelByMessage(&msg)
-			assert.Equal(t, tt.wantModel, gotModel)
-			assert.Equal(t, tt.wantMessage, msg)
-		})
-	}
 }
