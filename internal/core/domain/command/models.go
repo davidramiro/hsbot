@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"hsbot/internal/adapters/generator"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
 	"strings"
@@ -10,14 +11,14 @@ import (
 )
 
 type Models struct {
-	ch      *Chat
+	or      *generator.OpenRouter
 	ts      port.TextSender
 	command string
 }
 
-func NewModels(ch *Chat, ts port.TextSender, command string) *Models {
+func NewModels(or *generator.OpenRouter, ts port.TextSender, command string) *Models {
 	return &Models{
-		ch:      ch,
+		or:      or,
 		ts:      ts,
 		command: command,
 	}
@@ -28,7 +29,7 @@ func (m *Models) GetCommand() string {
 }
 
 func (m *Models) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
-	models := m.ch.models
+	models := m.or.Models
 
 	sb := &strings.Builder{}
 

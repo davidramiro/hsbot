@@ -11,7 +11,6 @@ type Prompt struct {
 	Prompt   string
 	ImageURL string
 	Author   Author
-	Model    Model
 }
 
 type Message struct {
@@ -42,6 +41,7 @@ type ModelResponse struct {
 type Model struct {
 	Keyword    string `json:"keyword"`
 	Identifier string `json:"identifier"`
+	Default    int    `json:"default"`
 }
 
 type ResponseMetadata struct {
@@ -49,4 +49,5 @@ type ResponseMetadata struct {
 	CompletionTokens int
 	TotalTokens      int
 	Cost             float64
+	Retries          int
 }

@@ -31,15 +31,16 @@ daily_spend_limit = 1.00
 
 [openrouter]
 api_key = "sk-api-key"
+# define a list of openrouter models here. add at least one default model with a priority.
+# on provider errors, the default models will all be consecutively tried for the request.
 models = [
-    { keyword = "claude", identifier = "anthropic/claude-sonnet-4"},
-    { keyword = "gpt", identifier = "openai/gpt-4.1"},
+    { keyword = "claude", identifier = "anthropic/claude-sonnet-4", Default = 1},
+    { keyword = "gpt", identifier = "openai/gpt-4.1", Default = 2},
     { keyword = "gemini", identifier = "google/gemini-2.5-pro-preview"},
     { keyword = "grok", identifier = "x-ai/grok-3-beta"},
     { keyword = "deepseek", identifier = "deepseek/deepseek-chat-v3-0324"},
     { keyword = "unslop", identifier = "thedrummer/unslopnemo-12b"},
 ]
-default_model = { keyword = "claude", identifier = "anthropic/claude-sonnet-4"}
 
 [fal]
 api_key = "4242:1234"

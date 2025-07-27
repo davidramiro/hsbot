@@ -7,7 +7,6 @@ import (
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
 	"hsbot/internal/core/service"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,8 +24,6 @@ type Chat struct {
 	cacheDuration time.Duration
 	command       string
 	cache         *sync.Map
-	models        []domain.Model
-	defaultModel  domain.Model
 	auth          service.Authorizer
 	track         service.Tracker
 	l             *zerolog.Logger
@@ -50,20 +47,6 @@ type ChatParams struct {
 }
 
 func NewChat(p ChatParams) (*Chat, error) {
-	var models []domain.Model
-	err := viper.UnmarshalKey("openrouter.models", &models)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to unmarshal openrouter models from config")
-		return nil, err
-	}
-
-	var model domain.Model
-	err = viper.UnmarshalKey("openrouter.default_model", &model)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to unmarshal openrouter default model from config")
-		return nil, err
-	}
-
 	logger := log.With().
 		Str("command", p.Command).
 		Str("handler", "chat").
@@ -76,8 +59,6 @@ func NewChat(p ChatParams) (*Chat, error) {
 		cacheDuration: p.CacheDuration,
 		command:       p.Command,
 		cache:         &sync.Map{},
-		models:        models,
-		defaultModel:  model,
 		auth:          p.Auth,
 		track:         p.Track,
 		l:             &logger,
@@ -119,7 +100,7 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 
 	go c.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
 
-	promptText, model, err := c.extractPrompt(ctx, message)
+	promptText, err := c.extractPrompt(ctx, message)
 	if err != nil {
 		err := c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to extract prompt: %w", err),
 			message)
@@ -142,18 +123,15 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 		if !message.IsReplyToBot {
 			conversation.messages = append(conversation.messages, domain.Prompt{
 				Author: domain.User,
-				Model:  model,
 				Prompt: message.ReplyToUsername + ": " + message.QuotedText})
 		}
 
 		conversation.messages = append(conversation.messages, domain.Prompt{
 			Author: domain.User,
-			Model:  model,
 			Prompt: promptText})
 	} else {
 		conversation.messages = append(conversation.messages, domain.Prompt{
 			Author:   domain.User,
-			Model:    model,
 			Prompt:   promptText,
 			ImageURL: message.ImageURL})
 	}
@@ -217,10 +195,12 @@ func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation
 }
 
 func (c *Chat) sendDebugInfo(message *domain.Message, metadata domain.ResponseMetadata, length int) {
-	debug := fmt.Sprintf(`debug: model: %s
+	debug := fmt.Sprintf(`debug:
+model: %s | retries: %d
 c tokens: %d | total tokens: %d
 convo size: %d | cost: %f`,
 		metadata.Model,
+		metadata.Retries,
 		metadata.CompletionTokens,
 		metadata.TotalTokens,
 		length,
@@ -237,25 +217,23 @@ convo size: %d | cost: %f`,
 	}
 }
 
-func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (string, domain.Model, error) {
+func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (string, error) {
 	promptText := ParseCommandArgs(message.Text)
 	if promptText == "" {
-		return "", domain.Model{}, domain.ErrEmptyPrompt
+		return "", domain.ErrEmptyPrompt
 	}
-
-	model := c.findModelByMessage(&promptText)
 
 	if message.AudioURL != "" {
 		transcript, err := c.transcriber.GenerateFromAudio(ctx, message.AudioURL)
 		if err != nil {
-			return "", domain.Model{}, fmt.Errorf("failed to generate transcript: %w", err)
+			return "", fmt.Errorf("failed to generate transcript: %w", err)
 		}
 
 		promptText += ": " + transcript
 	}
 
 	promptText = message.Username + ": " + promptText
-	return promptText, model, nil
+	return promptText, nil
 }
 
 func (c *Chat) startConversationTimer(convo *Conversation) {
@@ -272,18 +250,4 @@ func (c *Chat) startConversationTimer(convo *Conversation) {
 			return
 		}
 	}
-}
-
-func (c *Chat) findModelByMessage(message *string) domain.Model {
-	for _, model := range c.models {
-		lowercaseMessage := strings.ToLower(*message)
-		lowerCaseModel := strings.ToLower("#" + model.Keyword)
-		if strings.Contains(lowercaseMessage, lowerCaseModel) {
-			i := strings.Index(lowercaseMessage, lowerCaseModel)
-			*message = (*message)[:i] + (*message)[i+len(lowerCaseModel):]
-			return model
-		}
-	}
-
-	return c.defaultModel
 }
