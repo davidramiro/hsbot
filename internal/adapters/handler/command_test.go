@@ -34,6 +34,15 @@ func (m *MockRegistry) ListCommands() []string {
 	return []string{"foo", "bar"}
 }
 
+type MockAuthorizer struct {
+	mock.Mock
+}
+
+func (m *MockAuthorizer) IsAuthorized(ctx context.Context, chatID int64) bool {
+	args := m.Called(ctx, chatID)
+	return args[0].(bool)
+}
+
 type MockCmdHandler struct{ mock.Mock }
 
 func (m *MockCmdHandler) Respond(ctx context.Context, timeout time.Duration, msg *domain.Message) error {
@@ -61,7 +70,7 @@ func TestCommandHandler_Handle(t *testing.T) {
 	type testcase struct {
 		name       string
 		update     *models.Update
-		mockSetup  func(r *MockRegistry, ch *MockCmdHandler)
+		mockSetup  func(r *MockRegistry, ch *MockCmdHandler, ma *MockAuthorizer)
 		wantCalled bool
 		wantMsg    *domain.Message
 	}
@@ -70,7 +79,7 @@ func TestCommandHandler_Handle(t *testing.T) {
 		{
 			name:   "no message in update",
 			update: &models.Update{},
-			mockSetup: func(_ *MockRegistry, _ *MockCmdHandler) {
+			mockSetup: func(_ *MockRegistry, _ *MockCmdHandler, _ *MockAuthorizer) {
 				// No call
 			},
 			wantCalled: false,
@@ -79,8 +88,9 @@ func TestCommandHandler_Handle(t *testing.T) {
 		{
 			name:   "unknown command",
 			update: makeUpdate("/unknown"),
-			mockSetup: func(r *MockRegistry, _ *MockCmdHandler) {
+			mockSetup: func(r *MockRegistry, _ *MockCmdHandler, a *MockAuthorizer) {
 				r.On("Get", "/unknown").Return(nil, errors.New("no handler"))
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(true)
 			},
 			wantCalled: false,
 			wantMsg:    nil,
@@ -88,10 +98,11 @@ func TestCommandHandler_Handle(t *testing.T) {
 		{
 			name:   "known command, Respond called successfully",
 			update: makeUpdate("/hello"),
-			mockSetup: func(r *MockRegistry, ch *MockCmdHandler) {
+			mockSetup: func(r *MockRegistry, ch *MockCmdHandler, a *MockAuthorizer) {
 				r.On("Get", "/hello").Return(ch, nil)
 				ch.On("Respond", mock.Anything, mock.Anything,
 					mock.AnythingOfType("*domain.Message")).Return(nil)
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(true)
 			},
 			wantCalled: true,
 			wantMsg: &domain.Message{
@@ -110,10 +121,11 @@ func TestCommandHandler_Handle(t *testing.T) {
 		{
 			name:   "known command with username tag, Respond called successfully",
 			update: makeUpdate("/hello@hsbot"),
-			mockSetup: func(r *MockRegistry, ch *MockCmdHandler) {
+			mockSetup: func(r *MockRegistry, ch *MockCmdHandler, a *MockAuthorizer) {
 				r.On("Get", "/hello").Return(ch, nil)
 				ch.On("Respond", mock.Anything, mock.Anything,
 					mock.AnythingOfType("*domain.Message")).Return(nil)
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(true)
 			},
 			wantCalled: true,
 			wantMsg: &domain.Message{
@@ -132,12 +144,22 @@ func TestCommandHandler_Handle(t *testing.T) {
 		{
 			name:   "known command, Respond returns error",
 			update: makeUpdate("/fail"),
-			mockSetup: func(r *MockRegistry, ch *MockCmdHandler) {
+			mockSetup: func(r *MockRegistry, ch *MockCmdHandler, a *MockAuthorizer) {
 				r.On("Get", "/fail").Return(ch, nil)
 				ch.On("Respond", mock.Anything, mock.Anything,
 					mock.AnythingOfType("*domain.Message")).Return(errors.New("fail"))
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(true)
 			},
 			wantCalled: true,
+			wantMsg:    nil,
+		},
+		{
+			name:   "known command, unauthorized",
+			update: makeUpdate("/fail"),
+			mockSetup: func(_ *MockRegistry, _ *MockCmdHandler, a *MockAuthorizer) {
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(false)
+			},
+			wantCalled: false,
 			wantMsg:    nil,
 		},
 	}
@@ -146,11 +168,12 @@ func TestCommandHandler_Handle(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reg := new(MockRegistry)
 			handler := new(MockCmdHandler)
+			ma := new(MockAuthorizer)
 			reg.cmd = handler
 			// Prepare mocks for this test case
-			tc.mockSetup(reg, handler)
+			tc.mockSetup(reg, handler, ma)
 
-			ch := NewCommand(reg, 3*time.Second)
+			ch := NewCommand(reg, 3*time.Second, ma)
 			ch.Handle(t.Context(), nil, tc.update)
 
 			// as the Respond() call is a goroutine, wait for finish

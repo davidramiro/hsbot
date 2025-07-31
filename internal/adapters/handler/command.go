@@ -5,6 +5,7 @@ import (
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/domain/command"
 	"hsbot/internal/core/port"
+	"hsbot/internal/core/service"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -15,10 +16,11 @@ import (
 type Command struct {
 	commandRegistry port.CommandRegistry
 	timeout         time.Duration
+	auth            service.Authorizer
 }
 
-func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration) *Command {
-	return &Command{commandRegistry: commandRegistry, timeout: timeout}
+func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration, authorizer service.Authorizer) *Command {
+	return &Command{commandRegistry: commandRegistry, timeout: timeout, auth: authorizer}
 }
 
 func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -31,6 +33,11 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 	}
 
 	log.Debug().Str("message", update.Message.Text).Msg("received command")
+
+	if !c.auth.IsAuthorized(ctx, update.Message.Chat.ID) {
+		log.Debug().Msg("not authorized")
+		return
+	}
 
 	cmd := command.ParseCommand(update.Message.Text)
 	commandHandler, err := c.commandRegistry.Get(cmd)

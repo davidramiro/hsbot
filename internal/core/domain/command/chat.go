@@ -24,9 +24,9 @@ type Chat struct {
 	cacheDuration time.Duration
 	command       string
 	cache         *sync.Map
-	auth          service.Authorizer
-	track         service.Tracker
-	l             *zerolog.Logger
+
+	track service.Tracker
+	l     *zerolog.Logger
 }
 
 type Conversation struct {
@@ -42,7 +42,6 @@ type ChatParams struct {
 	Transcriber   port.Transcriber
 	Command       string
 	CacheDuration time.Duration
-	Auth          service.Authorizer
 	Track         service.Tracker
 }
 
@@ -59,7 +58,6 @@ func NewChat(p ChatParams) (*Chat, error) {
 		cacheDuration: p.CacheDuration,
 		command:       p.Command,
 		cache:         &sync.Map{},
-		auth:          p.Auth,
 		track:         p.Track,
 		l:             &logger,
 	}
@@ -87,11 +85,6 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
-	if !c.auth.IsAuthorized(ctx, message.ChatID) {
-		l.Debug().Msg("not authorized")
-		return nil
-	}
 
 	if !c.track.CheckLimit(ctx, message.ChatID) {
 		l.Debug().Msg("spending limit reached")

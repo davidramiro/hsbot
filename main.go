@@ -48,7 +48,12 @@ func main() {
 		log.Panic().Err(err).Msg("invalid timeout for handler in config")
 	}
 
-	commandHandler := handler.NewCommand(registry, handlerTimeout)
+	auth, err := service.NewAuthorizer(t)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed initializing authorizer")
+	}
+
+	commandHandler := handler.NewCommand(registry, handlerTimeout, auth)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
@@ -77,11 +82,6 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 
 	registry := &command.Registry{}
 
-	auth, err := service.NewAuthorizer(t)
-	if err != nil {
-		log.Panic().Err(err).Msg("failed initializing authorizer")
-	}
-
 	track := service.NewUsageTracker(ctx, t)
 
 	chat, err := command.NewChat(command.ChatParams{
@@ -90,7 +90,6 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 		Transcriber:   fal,
 		Command:       "/chat",
 		CacheDuration: viper.GetDuration("chat.context_timeout"),
-		Auth:          auth,
 		Track:         track,
 	})
 
@@ -100,8 +99,8 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 
 	registry.Register(chat)
 	registry.Register(command.NewModels(or, t, "/models"))
-	registry.Register(command.NewImage(fal, t, t, auth, track, "/image"))
-	registry.Register(command.NewEdit(fal, t, t, auth, track, "/edit"))
+	registry.Register(command.NewImage(fal, t, t, track, "/image"))
+	registry.Register(command.NewEdit(fal, t, t, track, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
 	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))

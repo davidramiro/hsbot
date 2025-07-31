@@ -19,7 +19,6 @@ type Image struct {
 	imageSender    port.ImageSender
 	textSender     port.TextSender
 	track          service.Tracker
-	auth           service.Authorizer
 	cost           float64
 	command        string
 }
@@ -27,7 +26,6 @@ type Image struct {
 func NewImage(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	auth service.Authorizer,
 	track service.Tracker,
 	command string) *Image {
 	return &Image{imageGenerator: imageGenerator,
@@ -35,7 +33,6 @@ func NewImage(imageGenerator port.ImageGenerator,
 		textSender:  textSender,
 		cost:        viper.GetFloat64("fal.image_gen_cost"),
 		track:       track,
-		auth:        auth,
 		command:     command}
 }
 
@@ -55,11 +52,6 @@ func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *dom
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
-	if !i.auth.IsAuthorized(ctx, message.ChatID) {
-		l.Debug().Msg("not authorized")
-		return nil
-	}
 
 	if !i.track.CheckLimit(ctx, message.ChatID) {
 		l.Debug().Msg("spending limit reached")
