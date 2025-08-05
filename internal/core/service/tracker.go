@@ -79,9 +79,10 @@ func (t *UsageTracker) ResetDailyLimit(ctx context.Context) {
 	}
 }
 
+const hoursPerDay = 24
+
 func getNextResetTime() time.Time {
-	now := time.Now()
-	return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	return time.Now().UTC().AddDate(0, 0, 1).Truncate(time.Hour * hoursPerDay)
 }
 
 func (t *UsageTracker) GetSpent(chatID int64) float64 {

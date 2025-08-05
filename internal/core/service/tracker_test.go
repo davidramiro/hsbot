@@ -130,12 +130,11 @@ func TestNewUsageTracker(t *testing.T) {
 }
 
 func TestGetNextResetTime(t *testing.T) {
-	now := time.Now()
 	reset := getNextResetTime()
 	assert.Equal(t, 0, reset.Hour())
 	assert.Equal(t, 0, reset.Minute())
 	assert.Equal(t, 0, reset.Second())
-	assert.Equal(t, now.Day()+1, reset.Day())
+	assert.Equal(t, time.Now().AddDate(0, 0, 1).Day(), reset.Day())
 }
 
 func TestGetSpent(t *testing.T) {
