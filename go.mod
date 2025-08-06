@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/go-telegram/bot v1.16.0
 	github.com/gofrs/uuid/v5 v5.3.2
-	github.com/revrost/go-openrouter v0.1.10
+	github.com/revrost/go-openrouter v0.2.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
