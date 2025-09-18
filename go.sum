@@ -30,8 +30,8 @@ github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/revrost/go-openrouter v0.1.10 h1:Gpe66HIPfYuZ2VIikHkAZ33oST3tqpqhg2YsmMKE9is=
-github.com/revrost/go-openrouter v0.1.10/go.mod h1:ZH/UdpnDEdMmJwq8tbSTX1S5I07ee8KMlEYN4jmegU0=
+github.com/revrost/go-openrouter v0.2.4 h1:ts9VMZGj8C6688xIgBU9/Tyw2WBl55WfdVP2zG+EV98=
+github.com/revrost/go-openrouter v0.2.4/go.mod h1:ZH/UdpnDEdMmJwq8tbSTX1S5I07ee8KMlEYN4jmegU0=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rs/xid v1.6.0/go.mod h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=
