@@ -3,6 +3,7 @@
 log_level = "info"
 # send additional debug info for openrouter requests as reply into chat
 debug_replies = false
+api_url = "https://api.telegram.org/bot"
 
 [chat]
 # Timeout to clear conversation cache per ChatID
