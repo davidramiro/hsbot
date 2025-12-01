@@ -3,7 +3,6 @@
 log_level = "info"
 # send additional debug info for openrouter requests as reply into chat
 debug_replies = false
-api_url = "https://api.telegram.org/bot"
 
 [chat]
 # Timeout to clear conversation cache per ChatID
@@ -29,6 +28,7 @@ admin_username = "admin_username"
 allowed_chat_ids = [ -4242424242, 424242424242 ]
 # daily spending limit in dollars, resets at 00:00 local time
 daily_spend_limit = 1.00
+api_url = "https://api.telegram.org"
 
 [openrouter]
 api_key = "sk-api-key"
