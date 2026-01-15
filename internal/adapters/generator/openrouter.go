@@ -89,7 +89,7 @@ func (o *OpenRouter) GenerateFromPrompt(
 				},
 			}
 		case domain.User:
-			msg, err := createUserMessage(prompt)
+			msg, err := createUserMessage(ctx, prompt)
 			if err != nil {
 				return domain.ModelResponse{}, fmt.Errorf("could not create openrouter response: %w", err)
 			}
@@ -151,12 +151,18 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 		fmt.Errorf("failed to get a response from openrouter, retry count: %d", len(o.defaultModels)-1)
 }
 
-func createUserMessage(prompt domain.Prompt) (openrouter.ChatCompletionMessage, error) {
+func createUserMessage(ctx context.Context, prompt domain.Prompt) (openrouter.ChatCompletionMessage, error) {
 	if prompt.ImageURL != "" {
-		resp, err := http.Get(prompt.ImageURL)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, prompt.ImageURL, nil)
+		if err != nil {
+			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not create image dl request: %w", err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not download image: %w", err)
 		}
+
 		defer resp.Body.Close()
 
 		data, err := io.ReadAll(resp.Body)

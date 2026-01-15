@@ -111,11 +111,11 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 
 func initBot() (*bot.Bot, error) {
 	token := viper.GetString("telegram.bot_token")
-	apiUrl := viper.GetString("telegram.api_url")
+	apiURL := viper.GetString("telegram.api_url")
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(noOpHandler),
-		bot.WithServerURL(apiUrl),
+		bot.WithServerURL(apiURL),
 	}
 
 	return bot.New(token, opts...)

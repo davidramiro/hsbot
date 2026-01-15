@@ -33,10 +33,11 @@ func (m *MockBot) SendChatAction(ctx context.Context, params *bot.SendChatAction
 }
 
 func TestTelegramSender_SendMessageReply(t *testing.T) {
-	longText := ""
-	for range TelegramMessageLimit + 10 {
-		longText += "x"
+	b := make([]byte, TelegramMessageLimit+10)
+	for i := range TelegramMessageLimit + 10 {
+		b[i] = 42
 	}
+	longText := string(b)
 
 	tests := []struct {
 		name      string
