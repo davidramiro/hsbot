@@ -2,9 +2,12 @@ package generator
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
+	"io"
+	"net/http"
 	"sort"
 	"strings"
 
@@ -86,7 +89,11 @@ func (o *OpenRouter) GenerateFromPrompt(
 				},
 			}
 		case domain.User:
-			messages[i+1] = createUserMessage(prompt)
+			msg, err := createUserMessage(prompt)
+			if err != nil {
+				return domain.ModelResponse{}, fmt.Errorf("could not create openrouter response: %w", err)
+			}
+			messages[i+1] = msg
 		}
 	}
 
@@ -144,14 +151,32 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 		fmt.Errorf("failed to get a response from openrouter, retry count: %d", len(o.defaultModels)-1)
 }
 
-func createUserMessage(prompt domain.Prompt) openrouter.ChatCompletionMessage {
+func createUserMessage(prompt domain.Prompt) (openrouter.ChatCompletionMessage, error) {
 	if prompt.ImageURL != "" {
+		resp, err := http.Get(prompt.ImageURL)
+		if err != nil {
+			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not download image: %w", err)
+		}
+		defer resp.Body.Close()
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not read image bytes: %w", err)
+		}
+
+		// Detect the actual type (image/jpeg, image/png, etc.)
+		mimeType := http.DetectContentType(data)
+
+		// Encode to Base64
+		encoded := base64.StdEncoding.EncodeToString(data)
+
 		return openrouter.ChatCompletionMessage{
 			Role: openrouter.ChatMessageRoleUser,
 			Content: openrouter.Content{Multi: []openrouter.ChatMessagePart{
 				{
-					Type:     openrouter.ChatMessagePartTypeImageURL,
-					ImageURL: &openrouter.ChatMessageImageURL{URL: prompt.ImageURL},
+					Type: openrouter.ChatMessagePartTypeImageURL,
+					ImageURL: &openrouter.ChatMessageImageURL{URL: fmt.Sprintf("data:%s;base64,%s",
+						mimeType, encoded)},
 				},
 				{
 					Type: openrouter.ChatMessagePartTypeText,
@@ -159,7 +184,7 @@ func createUserMessage(prompt domain.Prompt) openrouter.ChatCompletionMessage {
 				},
 			},
 			},
-		}
+		}, nil
 	}
 
 	return openrouter.ChatCompletionMessage{
@@ -167,7 +192,7 @@ func createUserMessage(prompt domain.Prompt) openrouter.ChatCompletionMessage {
 		Content: openrouter.Content{
 			Text: prompt.Prompt,
 		},
-	}
+	}, nil
 }
 
 func (o *OpenRouter) findModelByMessage(message *string) domain.Model {

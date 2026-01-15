@@ -150,7 +150,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 				{
 					Prompt:   "describe this",
 					Author:   domain.User,
-					ImageURL: "http://image",
+					ImageURL: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg",
 				},
 			},
 			mockResp: openrouter.ChatCompletionResponse{
