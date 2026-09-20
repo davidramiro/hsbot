@@ -162,6 +162,31 @@ func TestCommandHandler_Handle(t *testing.T) {
 			wantCalled: false,
 			wantMsg:    nil,
 		},
+		{
+			name: "photo caption is used as text",
+			update: &models.Update{
+				Message: &models.Message{
+					ID:      1,
+					Caption: "/hello",
+					Photo:   []models.PhotoSize{},
+					Chat:    models.Chat{ID: 100},
+					From:    &models.User{ID: 200, Username: "bob", FirstName: "bob"},
+				},
+			},
+			mockSetup: func(r *MockRegistry, ch *MockCmdHandler, a *MockAuthorizer) {
+				r.On("Get", "/hello").Return(ch, nil)
+				ch.On("Respond", mock.Anything, mock.Anything,
+					mock.AnythingOfType("*domain.Message")).Return(nil)
+				a.On("IsAuthorized", mock.Anything, mock.Anything).Return(true)
+			},
+			wantCalled: true,
+			wantMsg: &domain.Message{
+				ID:       1,
+				ChatID:   100,
+				Username: "@bob",
+				Text:     "/hello",
+			},
+		},
 	}
 
 	for _, tc := range tests {

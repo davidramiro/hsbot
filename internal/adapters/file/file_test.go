@@ -1,9 +1,11 @@
 package file
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -127,4 +129,27 @@ func TestGetTempFile(t *testing.T) {
 			assert.Equal(t, tc.want, file)
 		})
 	}
+}
+
+func TestDownloadFileInvalidURL(t *testing.T) {
+	_, err := DownloadFile(t.Context(), "://bad")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "error creating request")
+}
+
+func TestDownloadFileRequestError(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := DownloadFile(ctx, "http://127.0.0.1:1")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "error executing request")
+}
+
+func TestGetTempFileMissing(t *testing.T) {
+	_, err := GetTempFile(filepath.Join(t.TempDir(), "missing.bin"))
+	require.Error(t, err)
+}
+
+func TestRemoveTempFileMissing(t *testing.T) {
+	RemoveTempFile(filepath.Join(t.TempDir(), "missing.bin"))
 }

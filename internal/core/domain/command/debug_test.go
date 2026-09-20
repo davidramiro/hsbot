@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"hsbot/internal/core/domain"
 	"strings"
 	"testing"
@@ -54,4 +55,15 @@ func TestDebug_Respond_SendsDebugInfo(t *testing.T) {
 	err := debugCmd.Respond(t.Context(), time.Second, msg)
 	require.NoError(t, err)
 	mockSender.AssertExpectations(t)
+}
+
+func TestDebug_Respond_SendError(t *testing.T) {
+	mockSender := new(MockSender)
+	debugCmd := NewDebug(mockSender, "debug")
+	msg := &domain.Message{ID: 1, ChatID: 2}
+
+	mockSender.On("SendMessageReply", mock.Anything, msg, mock.Anything).Return(0, errors.New("fail"))
+
+	err := debugCmd.Respond(t.Context(), time.Second, msg)
+	require.Error(t, err)
 }

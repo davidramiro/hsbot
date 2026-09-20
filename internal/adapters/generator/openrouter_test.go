@@ -531,3 +531,126 @@ func TestOpenRouter_GenerateImageAPIError(t *testing.T) {
 	_, err := gen.NewImage(t.Context(), "a cat")
 	require.Error(t, err)
 }
+
+func TestNewOpenRouterErrors(t *testing.T) {
+	valid := Config{
+		TextModels:  []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+		ImageModels: []domain.Model{{Keyword: "flash", Identifier: "img", Default: 1}},
+		Voices:      []domain.Model{{Keyword: "v", Identifier: "voice"}},
+	}
+
+	t.Run("no default text model", func(t *testing.T) {
+		cfg := valid
+		cfg.TextModels = []domain.Model{{Keyword: "gpt", Identifier: "gpt"}}
+		_, err := NewOpenRouter(cfg)
+		require.EqualError(t, err, "no default model found")
+	})
+
+	t.Run("no default image model", func(t *testing.T) {
+		cfg := valid
+		cfg.ImageModels = []domain.Model{{Keyword: "flash", Identifier: "img"}}
+		_, err := NewOpenRouter(cfg)
+		require.EqualError(t, err, "no default image model found")
+	})
+
+	t.Run("no voices", func(t *testing.T) {
+		cfg := valid
+		cfg.Voices = nil
+		_, err := NewOpenRouter(cfg)
+		require.EqualError(t, err, "no voice models found")
+	})
+}
+
+func TestOpenRouter_ListTextModels(t *testing.T) {
+	models := []domain.Model{{Keyword: "gpt", Identifier: "gpt"}}
+	or := &OpenRouter{TextModels: models}
+	assert.Equal(t, models, or.ListTextModels())
+}
+
+func TestOpenRouter_GenerateFromPromptImageDownloadError(t *testing.T) {
+	gen := &OpenRouter{
+		client:            &mockClient{},
+		TextModels:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+		defaultTextModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+	}
+
+	_, err := gen.GenerateFromPrompt(t.Context(), []domain.Prompt{{
+		Author:   domain.User,
+		Prompt:   "see",
+		ImageURL: "://bad",
+	}})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "could not create openrouter response")
+}
+
+func TestImageFromResponseErrors(t *testing.T) {
+	_, err := imageFromResponse(openrouter.ImageGenerationResponse{})
+	require.EqualError(t, err, "no images returned from openrouter")
+
+	_, err = imageFromResponse(openrouter.ImageGenerationResponse{
+		Data: []openrouter.ImageGenerationData{{B64JSON: "not-base64"}},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to decode image")
+}
+
+func TestOpenRouter_CreateImageNoModel(t *testing.T) {
+	gen := &OpenRouter{}
+	_, err := gen.NewImage(t.Context(), "a cat")
+	require.EqualError(t, err, "no image model configured")
+}
+
+func TestOpenRouter_SpeakNoVoices(t *testing.T) {
+	gen := &OpenRouter{}
+	_, err := gen.Speak(t.Context(), "hi")
+	require.EqualError(t, err, "no voice models configured")
+}
+
+func TestOpenRouter_Transcribe(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ogg"))
+	}))
+	t.Cleanup(srv.Close)
+
+	cost := 0.02
+	mock := &mockClient{
+		createTranscriptionFunc: func(_ context.Context, req openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error) {
+			assert.Equal(t, "stt-model", req.Model)
+			return openrouter.TranscriptionResponse{
+				Text:  "hello",
+				Usage: &openrouter.TranscriptionUsage{Cost: cost},
+			}, nil
+		},
+	}
+	gen := &OpenRouter{client: mock, sttModel: "stt-model"}
+
+	got, err := gen.Transcribe(t.Context(), srv.URL)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", got.Response)
+	assert.InDelta(t, cost, got.Metadata.Cost, 1e-9)
+}
+
+func TestOpenRouter_TranscribeDownloadError(t *testing.T) {
+	gen := &OpenRouter{}
+	_, err := gen.Transcribe(t.Context(), "://bad")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to download audio")
+}
+
+func TestOpenRouter_TranscribeAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ogg"))
+	}))
+	t.Cleanup(srv.Close)
+
+	mock := &mockClient{
+		createTranscriptionFunc: func(_ context.Context, _ openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error) {
+			return openrouter.TranscriptionResponse{}, errors.New("stt fail")
+		},
+	}
+	gen := &OpenRouter{client: mock, sttModel: "stt-model"}
+
+	_, err := gen.Transcribe(t.Context(), srv.URL)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "openrouter transcription API error")
+}

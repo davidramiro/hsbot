@@ -84,3 +84,12 @@ func TestTranscribeRespondErrorEmptyURLAndSending(t *testing.T) {
 	_ = transcribeHandler.Respond(t.Context(), time.Minute, &domain.Message{})
 	assert.Equal(t, "reply to an audio", ts.Message)
 }
+
+func TestTranscribeRespondSpendingLimit(t *testing.T) {
+	ts := &MockTextSender{}
+	h := NewTranscribe(&MockTranscriber{}, ts, &MockTracker{withinLimit: false}, "/transcribe")
+
+	err := h.Respond(t.Context(), time.Minute, &domain.Message{AudioURL: "mock"})
+	require.NoError(t, err)
+	assert.Empty(t, ts.Message)
+}

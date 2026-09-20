@@ -113,3 +113,15 @@ func TestEditHandler_SendImageURLReplyError(t *testing.T) {
 	assert.Contains(t, mt.Message, "error sending edited image: send-failed")
 	assert.True(t, ms.called)
 }
+
+func TestEditHandler_SpendingLimit(t *testing.T) {
+	ms := &MockImageSender{}
+	eh := NewEdit(&MockImageGenerator{data: []byte("png")}, ms, &MockTextSender{},
+		&MockTracker{withinLimit: false}, "/edit")
+
+	err := eh.Respond(t.Context(), time.Second, &domain.Message{
+		ID: 1, ChatID: 1, Text: "/edit enhance", ImageURL: "img",
+	})
+	require.NoError(t, err)
+	assert.False(t, ms.called)
+}

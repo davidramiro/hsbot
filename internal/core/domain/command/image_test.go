@@ -129,6 +129,16 @@ func TestImageRepondErrorGeneratingAndSending(t *testing.T) {
 	require.EqualError(t, mt.err, "mock error")
 }
 
+func TestImageRespondSpendingLimit(t *testing.T) {
+	ms := &MockImageSender{}
+	imageHandler := NewImage(&MockImageGenerator{data: []byte("png")}, ms, &MockTextSender{},
+		&MockTracker{withinLimit: false}, "/image")
+
+	err := imageHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
+	require.NoError(t, err)
+	assert.False(t, ms.called)
+}
+
 func TestImageRepondErrorEmptyPromptAndErrorSending(t *testing.T) {
 	mg := &MockImageGenerator{}
 	mi := &MockImageSender{}

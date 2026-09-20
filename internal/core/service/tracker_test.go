@@ -134,6 +134,27 @@ func TestGetNextResetTime(t *testing.T) {
 	assert.Equal(t, time.Now().AddDate(0, 0, 1).Day(), reset.Day())
 }
 
+func TestResetDailyLimitStops(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	tracker := &UsageTracker{
+		chats: map[int64]float64{1: 1},
+		mutex: sync.Mutex{},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		tracker.ResetDailyLimit(ctx)
+		close(done)
+	}()
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("ResetDailyLimit did not stop")
+	}
+}
+
 func TestGetSpent(t *testing.T) {
 	tracker := &UsageTracker{
 		chats: map[int64]float64{

@@ -308,3 +308,28 @@ func TestSendChatAction_RepeatsAndStopsOnContextCancel(t *testing.T) {
 	}
 	mb.AssertCalled(t, "SendChatAction", mock.Anything, mock.Anything)
 }
+
+func TestSendChatAction_MapsActions(t *testing.T) {
+	tests := []struct {
+		name   string
+		action domain.Action
+		want   models.ChatAction
+	}{
+		{name: "photo", action: domain.SendingPhoto, want: models.ChatActionUploadPhoto},
+		{name: "voice", action: domain.RecordingVoiceAction, want: models.ChatActionRecordVoice},
+		{name: "default", action: domain.Action("other"), want: models.ChatActionTyping},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mb := new(MockBot)
+			sender := NewTelegram(mb)
+			mb.On("SendChatAction", mock.Anything, mock.MatchedBy(func(params *bot.SendChatActionParams) bool {
+				return params.Action == tc.want
+			})).Return(false, errors.New("stop")).Once()
+
+			sender.SendChatAction(t.Context(), 1, tc.action)
+			mb.AssertExpectations(t)
+		})
+	}
+}

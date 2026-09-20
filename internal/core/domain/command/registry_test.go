@@ -92,6 +92,11 @@ func TestListServices(t *testing.T) {
 	assert.Contains(t, list, "/bar")
 }
 
+func TestListCommandsUninitialized(t *testing.T) {
+	cr := &Registry{}
+	assert.Empty(t, cr.ListCommands())
+}
+
 func TestParseCommandArgs(t *testing.T) {
 	type TestCase struct {
 		description string
@@ -158,6 +163,11 @@ func TestParseCommand(t *testing.T) {
 			description: "empty on no input",
 			args:        "",
 			want:        "",
+		},
+		{
+			description: "strips bot handle",
+			args:        "/chat@hsbot prompt",
+			want:        "/chat",
 		},
 	}
 
