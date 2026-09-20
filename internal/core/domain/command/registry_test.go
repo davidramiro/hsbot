@@ -30,6 +30,20 @@ func TestRegister(t *testing.T) {
 	assert.Len(t, cr.commands, 1)
 }
 
+func TestRegisterAlias(t *testing.T) {
+	cr := &Registry{}
+	mr := &MockResponder{command: "/chat"}
+
+	cr.Register(mr)
+	cr.RegisterAlias("/speak", mr)
+
+	assert.Len(t, cr.commands, 2)
+
+	got, err := cr.Get("/speak")
+	require.NoError(t, err)
+	assert.Equal(t, mr, got)
+}
+
 func TestGetNotRegistered(t *testing.T) {
 	cr := &Registry{}
 

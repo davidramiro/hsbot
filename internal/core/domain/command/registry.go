@@ -21,6 +21,15 @@ func (r *Registry) Register(handler port.Command) {
 	r.commands[handler.GetCommand()] = handler
 }
 
+func (r *Registry) RegisterAlias(alias string, handler port.Command) {
+	if r.commands == nil {
+		r.commands = make(map[string]port.Command)
+	}
+
+	log.Info().Str("handler", alias).Msg("adding command alias to registry")
+	r.commands[alias] = handler
+}
+
 func (r *Registry) Get(command string) (port.Command, error) {
 	log.Trace().Interface("command", command).Msg("fetching command handler from registry")
 
