@@ -56,6 +56,25 @@ func (m *MockTextSender) NotifyAndReturnError(_ context.Context, err error, _ *d
 
 func (m *MockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {}
 
+type MockAudioGenerator struct {
+	audio []byte
+	err   error
+}
+
+func (m *MockAudioGenerator) GenerateSpeech(_ context.Context, _ string) ([]byte, error) {
+	return m.audio, m.err
+}
+
+type MockAudioSender struct {
+	file []byte
+	err  error
+}
+
+func (m *MockAudioSender) SendAudioReply(_ context.Context, _ *domain.Message, file []byte) error {
+	m.file = file
+	return m.err
+}
+
 type MockTracker struct {
 	withinLimit bool
 }
@@ -501,4 +520,139 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 
 	assert.Equal(t, "failed to generate response: mock error", ms.Message)
 	require.Errorf(t, err, "failed to send reply")
+}
+
+func TestNewChatSpokenRequiresAudio(t *testing.T) {
+	_, err := NewChat(ChatParams{
+		Command:      "/chat",
+		SpeakCommand: "/speak",
+	})
+	require.Error(t, err)
+}
+
+func TestChatHandlerSpeakSuccess(t *testing.T) {
+	viper.Set("bot.debug_replies", false)
+
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+	mtr := &MockTracker{withinLimit: true}
+	mag := &MockAudioGenerator{audio: []byte("mp3")}
+	mas := &MockAudioSender{}
+
+	chatHandler, err := NewChat(ChatParams{
+		TextGenerator:  mg,
+		TextSender:     ms,
+		Transcriber:    mt,
+		AudioGenerator: mag,
+		AudioSender:    mas,
+		Command:        "/chat",
+		SpeakCommand:   "/speak",
+		CacheDuration:  time.Second * 3,
+		Track:          mtr,
+	})
+	require.NoError(t, err)
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/speak prompt"})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("mp3"), mas.file)
+	assert.Empty(t, ms.Message)
+}
+
+func TestChatHandlerSpeakSharesContextWithChat(t *testing.T) {
+	viper.Set("bot.debug_replies", false)
+
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+	mtr := &MockTracker{withinLimit: true}
+	mag := &MockAudioGenerator{audio: []byte("mp3")}
+	mas := &MockAudioSender{}
+
+	chatHandler, err := NewChat(ChatParams{
+		TextGenerator:  mg,
+		TextSender:     ms,
+		Transcriber:    mt,
+		AudioGenerator: mag,
+		AudioSender:    mas,
+		Command:        "/chat",
+		SpeakCommand:   "/speak",
+		CacheDuration:  time.Second * 3,
+		Track:          mtr,
+	})
+	require.NoError(t, err)
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat prompt"})
+	require.NoError(t, err)
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 2, Username: "@unit", Text: "/speak prompt2"})
+	require.NoError(t, err)
+
+	c, ok := chatHandler.cache.Load(int64(1))
+	require.True(t, ok)
+
+	conversation, ok := c.(*Conversation)
+	require.True(t, ok)
+	assert.Len(t, conversation.messages, 4)
+	assert.Equal(t, []byte("mp3"), mas.file)
+}
+
+func TestChatHandlerSpeakGeneratorError(t *testing.T) {
+	viper.Set("bot.debug_replies", false)
+
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+	mtr := &MockTracker{withinLimit: true}
+	mag := &MockAudioGenerator{err: errors.New("tts fail")}
+	mas := &MockAudioSender{}
+
+	chatHandler, err := NewChat(ChatParams{
+		TextGenerator:  mg,
+		TextSender:     ms,
+		Transcriber:    mt,
+		AudioGenerator: mag,
+		AudioSender:    mas,
+		Command:        "/chat",
+		SpeakCommand:   "/speak",
+		CacheDuration:  time.Second * 3,
+		Track:          mtr,
+	})
+	require.NoError(t, err)
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/speak prompt"})
+	require.Error(t, err)
+	assert.Equal(t, "failed to generate speech: tts fail", ms.Message)
+}
+
+func TestChatHandlerAudioOnlyPrompt(t *testing.T) {
+	viper.Set("bot.debug_replies", false)
+
+	mg := &MockTextGenerator{response: "mock response"}
+	ms := &MockTextSender{}
+	mt := &MockTranscriber{}
+	mtr := &MockTracker{withinLimit: true}
+
+	chatHandler, err := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    ms,
+		Transcriber:   mt,
+		Command:       "/chat",
+		CacheDuration: time.Second * 3,
+		Track:         mtr,
+	})
+	require.NoError(t, err)
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
+		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat", AudioURL: "foo"})
+	require.NoError(t, err)
+
+	c, ok := chatHandler.cache.Load(int64(1))
+	require.True(t, ok)
+
+	conversation, ok := c.(*Conversation)
+	require.True(t, ok)
+	assert.Equal(t, "@unit: foo", conversation.messages[0].Prompt)
 }

@@ -24,3 +24,7 @@ type ImageGenerator interface {
 	// context.
 	EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string, error)
 }
+
+type AudioGenerator interface {
+	GenerateSpeech(ctx context.Context, text string) ([]byte, error)
+}

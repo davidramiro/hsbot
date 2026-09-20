@@ -29,7 +29,7 @@ func (m *Models) GetCommand() string {
 }
 
 func (m *Models) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
-	models := m.or.Models
+	models := m.or.TextModels
 
 	sb := &strings.Builder{}
 

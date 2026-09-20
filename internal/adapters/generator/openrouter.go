@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"hsbot/internal/adapters/file"
 	"hsbot/internal/core/domain"
 	"io"
 	"net/http"
@@ -19,16 +20,22 @@ import (
 
 // OpenRouter wraps the OpenRouter API.
 type OpenRouter struct {
-	client        OpenRouterClient
-	Models        []domain.Model
-	defaultModels []domain.Model
-	systemPrompt  string
+	client            OpenRouterClient
+	TextModels        []domain.Model
+	defaultTextModels []domain.Model
+	voiceModels       []domain.Model
+	ttsModel          string
+	sttModel          string
+	systemPrompt      string
 }
 
 // OpenRouterClient wraps all used methods from *openrouter.Client. Used for mocking in tests.
 type OpenRouterClient interface {
 	CreateChatCompletion(ctx context.Context,
 		ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error)
+	CreateSpeech(ctx context.Context, request openrouter.SpeechRequest) (openrouter.SpeechResponse, error)
+	CreateTranscription(ctx context.Context,
+		request openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error)
 }
 
 func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
@@ -62,8 +69,24 @@ func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
 		return nil, errors.New("no default model found")
 	}
 
-	or.Models = models
-	or.defaultModels = defaultModels
+	or.TextModels = models
+	or.defaultTextModels = defaultModels
+
+	or.ttsModel = viper.GetString("openrouter.tts_model")
+	or.sttModel = viper.GetString("openrouter.stt_model")
+
+	var voices []domain.Model
+	err = viper.UnmarshalKey("openrouter.voices", &voices)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to unmarshal openrouter voices from config")
+		return nil, err
+	}
+
+	or.voiceModels = voices
+
+	if len(or.voiceModels) == 0 {
+		return nil, errors.New("no voice models found")
+	}
 
 	return or, nil
 }
@@ -116,7 +139,7 @@ const ORProviderError = "Provider returned error"
 
 func (o *OpenRouter) retryCompletion(ctx context.Context,
 	ccr openrouter.ChatCompletionRequest) (domain.ModelResponse, error) {
-	for i := -1; i < len(o.defaultModels); i++ {
+	for i := -1; i < len(o.defaultTextModels); i++ {
 		if ccr.Model == "" {
 			// no specific model requested, start with first index from default models
 			i = 0
@@ -124,7 +147,7 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 
 		// we're either on a retry or default model iteration
 		if i != -1 {
-			ccr.Model = o.defaultModels[i].Identifier
+			ccr.Model = o.defaultTextModels[i].Identifier
 		}
 
 		resp, err := o.client.CreateChatCompletion(ctx, ccr)
@@ -148,7 +171,7 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 	}
 
 	return domain.ModelResponse{},
-		fmt.Errorf("failed to get a response from openrouter, retry count: %d", len(o.defaultModels)-1)
+		fmt.Errorf("failed to get a response from openrouter, retry count: %d", len(o.defaultTextModels)-1)
 }
 
 func createUserMessage(ctx context.Context, prompt domain.Prompt) (openrouter.ChatCompletionMessage, error) {
@@ -202,7 +225,7 @@ func createUserMessage(ctx context.Context, prompt domain.Prompt) (openrouter.Ch
 }
 
 func (o *OpenRouter) findModelByMessage(message *string) domain.Model {
-	for _, model := range o.Models {
+	for _, model := range o.TextModels {
 		lowercaseMessage := strings.ToLower(*message)
 		lowerCaseModel := strings.ToLower("#" + model.Keyword)
 		if strings.Contains(lowercaseMessage, lowerCaseModel) {
@@ -213,4 +236,41 @@ func (o *OpenRouter) findModelByMessage(message *string) domain.Model {
 	}
 
 	return domain.Model{}
+}
+
+func (o *OpenRouter) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
+	if len(o.voiceModels) == 0 {
+		return nil, errors.New("no voice models configured")
+	}
+
+	result, err := o.client.CreateSpeech(ctx, openrouter.SpeechRequest{
+		Model:          o.ttsModel,
+		Input:          text,
+		Voice:          o.voiceModels[0].Identifier,
+		ResponseFormat: openrouter.SpeechResponseFormatMp3,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("openrouter speech API error: %w", err)
+	}
+
+	return result.Audio, nil
+}
+
+func (o *OpenRouter) GenerateFromAudio(ctx context.Context, url string) (string, error) {
+	f, err := file.DownloadFile(ctx, url)
+	if err != nil {
+		return "", fmt.Errorf("failed to download audio: %w", err)
+	}
+
+	resp, err := o.client.CreateTranscription(ctx, openrouter.TranscriptionRequest{
+		Model:      o.sttModel,
+		InputAudio: openrouter.NewTranscriptionInputAudio(f, openrouter.AudioFormatOgg),
+	})
+	if err != nil {
+		return "", fmt.Errorf("openrouter transcription API error: %w", err)
+	}
+
+	log.Debug().Interface("result", resp.Text).Msg("openrouter transcript")
+
+	return resp.Text, nil
 }

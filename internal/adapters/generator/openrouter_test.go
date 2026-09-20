@@ -18,11 +18,31 @@ import (
 type mockClient struct {
 	createChatCompletionFunc func(ctx context.Context,
 		ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error)
+	createSpeechFunc func(ctx context.Context,
+		request openrouter.SpeechRequest) (openrouter.SpeechResponse, error)
+	createTranscriptionFunc func(ctx context.Context,
+		request openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error)
 }
 
 func (m *mockClient) CreateChatCompletion(ctx context.Context,
 	ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error) {
 	return m.createChatCompletionFunc(ctx, ccr)
+}
+
+func (m *mockClient) CreateSpeech(ctx context.Context,
+	request openrouter.SpeechRequest) (openrouter.SpeechResponse, error) {
+	if m.createSpeechFunc == nil {
+		return openrouter.SpeechResponse{}, nil
+	}
+	return m.createSpeechFunc(ctx, request)
+}
+
+func (m *mockClient) CreateTranscription(ctx context.Context,
+	request openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error) {
+	if m.createTranscriptionFunc == nil {
+		return openrouter.TranscriptionResponse{}, nil
+	}
+	return m.createTranscriptionFunc(ctx, request)
 }
 
 func TestNewOpenRouter(t *testing.T) {
@@ -43,6 +63,11 @@ func TestNewOpenRouter(t *testing.T) {
 		})
 	}
 	viper.Set("openrouter.models", expectedModels)
+	viper.Set("openrouter.voices", []domain.Model{
+		{Keyword: "default", Identifier: "voice-id", Default: 1},
+	})
+	viper.Set("openrouter.tts_model", "tts-model")
+	viper.Set("openrouter.stt_model", "stt-model")
 
 	apiKey := "fakeApiKey"
 	systemPrompt := "system test"
@@ -50,8 +75,8 @@ func TestNewOpenRouter(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, or)
-	assert.Len(t, or.Models, 2)
-	assert.Equal(t, expectedModels, or.Models)
+	assert.Len(t, or.TextModels, 2)
+	assert.Equal(t, expectedModels, or.TextModels)
 	assert.Equal(t, systemPrompt, or.systemPrompt)
 }
 
@@ -186,10 +211,10 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 				},
 			}
 			gen := &OpenRouter{
-				client:        mock,
-				systemPrompt:  tc.systemPrompt,
-				Models:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
-				defaultModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+				client:            mock,
+				systemPrompt:      tc.systemPrompt,
+				TextModels:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+				defaultTextModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
 			}
 			resp, err := gen.GenerateFromPrompt(t.Context(), tc.prompts)
 			if tc.expectErr {
@@ -269,10 +294,10 @@ func TestOpenRouter_RetryCompletion(t *testing.T) {
 			}
 
 			gen := &OpenRouter{
-				client:        mock,
-				systemPrompt:  systemPrompt,
-				Models:        defaultModels,
-				defaultModels: defaultModels,
+				client:            mock,
+				systemPrompt:      systemPrompt,
+				TextModels:        defaultModels,
+				defaultTextModels: defaultModels,
 			}
 			req := openrouter.ChatCompletionRequest{
 				Model:    defaultModels[0].Identifier,
@@ -300,7 +325,7 @@ func TestFindModelByMessage(t *testing.T) {
 	}
 
 	handler := &OpenRouter{
-		Models: models,
+		TextModels: models,
 	}
 
 	tests := []struct {
@@ -341,6 +366,52 @@ func TestFindModelByMessage(t *testing.T) {
 			gotModel := handler.findModelByMessage(&msg)
 			assert.Equal(t, tt.wantModel, gotModel)
 			assert.Equal(t, tt.wantMessage, msg)
+		})
+	}
+}
+
+func TestOpenRouter_GenerateSpeech(t *testing.T) {
+	tests := []struct {
+		name    string
+		audio   []byte
+		mockErr error
+		wantErr bool
+	}{
+		{
+			name:  "success",
+			audio: []byte("mp3-bytes"),
+		},
+		{
+			name:    "api error",
+			mockErr: errors.New("speech failed"),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockClient{
+				createSpeechFunc: func(_ context.Context, req openrouter.SpeechRequest) (openrouter.SpeechResponse, error) {
+					assert.Equal(t, "tts-model", req.Model)
+					assert.Equal(t, "hello", req.Input)
+					assert.Equal(t, "voice-id", req.Voice)
+					assert.Equal(t, openrouter.SpeechResponseFormatMp3, req.ResponseFormat)
+					return openrouter.SpeechResponse{Audio: tt.audio}, tt.mockErr
+				},
+			}
+			gen := &OpenRouter{
+				client:      mock,
+				ttsModel:    "tts-model",
+				voiceModels: []domain.Model{{Keyword: "default", Identifier: "voice-id"}},
+			}
+
+			got, err := gen.GenerateSpeech(t.Context(), "hello")
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.audio, got)
 		})
 	}
 }

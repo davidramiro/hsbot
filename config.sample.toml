@@ -42,13 +42,17 @@ models = [
     { keyword = "deepseek", identifier = "deepseek/deepseek-chat-v3-0324"},
     { keyword = "unslop", identifier = "thedrummer/unslopnemo-12b"},
 ]
+tts_model = "fish-audio/s2.1-pro"
+stt_model = "openai/whisper-large-v3-turbo"
+voices = [
+    { keyword = "default", identifier = "b347db033a6549378b48d00acb0d06cd", Default = 1},
+]
 
 [fal]
 api_key = "4242:1234"
 image_gen_url = "https://fal.run/fal-ai/imagen3/fast"
 # cost per generated image
 image_gen_cost = 0.025
-whisper_url = "https://fal.run/fal-ai/whisper"
 image_edit_url = "https://fal.run/fal-ai/bagel/edit"
 # cost per edited image
 image_edit_cost = 0.10

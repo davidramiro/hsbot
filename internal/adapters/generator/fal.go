@@ -17,15 +17,13 @@ import (
 type FAL struct {
 	falAPIKey               string
 	imageGenerationEndpoint string
-	whisperEndpoint         string
 	imageEditingEndpoint    string
 }
 
-func NewFAL(imageGenerationEndpoint, imageEditingEndpoint, whisperEndpoint, apiKey string) *FAL {
+func NewFAL(imageGenerationEndpoint, imageEditingEndpoint, apiKey string) *FAL {
 	return &FAL{
 		falAPIKey:               apiKey,
 		imageGenerationEndpoint: imageGenerationEndpoint,
-		whisperEndpoint:         whisperEndpoint,
 		imageEditingEndpoint:    imageEditingEndpoint,
 	}
 }
@@ -119,42 +117,6 @@ func (f *FAL) EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string,
 	log.Debug().Interface("result", result).Msg("FAL imageResponse")
 
 	return result.Images[0].URL, nil
-}
-
-type audioRequest struct {
-	AudioURL string `json:"audio_url"`
-}
-
-type audioResponse struct {
-	Text string `json:"text"`
-}
-
-func (f *FAL) GenerateFromAudio(ctx context.Context, url string) (string, error) {
-	falRequest := audioRequest{
-		AudioURL: url,
-	}
-
-	payloadBuf := new(bytes.Buffer)
-	err := json.NewEncoder(payloadBuf).Encode(falRequest)
-	if err != nil {
-		return "", fmt.Errorf("error encoding FAL request: %w", err)
-	}
-
-	body, err := f.postFALRequest(ctx, f.whisperEndpoint, payloadBuf)
-	if err != nil {
-		return "", fmt.Errorf("error executing FAL request: %w", err)
-	}
-
-	log.Debug().Interface("body", body).Msg("FAL audioResponse")
-
-	var result audioResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("error unmarshalling FAL audioResponse: %w", err)
-	}
-
-	log.Debug().Interface("result", result).Msg("FAL audioResponse")
-
-	return result.Text, nil
 }
 
 func (f *FAL) postFALRequest(ctx context.Context, url string, payloadBuf *bytes.Buffer) ([]byte, error) {

@@ -70,7 +70,7 @@ func TestFALGenerator_GenerateFromPrompt(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			g := NewFAL(srv.URL, srv.URL, srv.URL, "test-api-key")
+			g := NewFAL(srv.URL, srv.URL, "test-api-key")
 
 			got, err := g.GenerateFromPrompt(t.Context(), "test prompt")
 			if tc.wantErr {
@@ -174,7 +174,7 @@ func TestFALGenerator_EditFromPrompt(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			g := NewFAL(srv.URL, srv.URL, srv.URL, "test-api-key")
+			g := NewFAL(srv.URL, srv.URL, "test-api-key")
 			ctx := t.Context()
 
 			got, err := g.EditFromPrompt(ctx, tc.input)
@@ -183,73 +183,6 @@ func TestFALGenerator_EditFromPrompt(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tc.wantURL, got)
-			}
-		})
-	}
-}
-
-func TestFALGenerator_GenerateFromAudio(t *testing.T) {
-	tests := []struct {
-		name           string
-		responseBody   interface{}
-		responseStatus int
-		wantText       string
-		wantErr        bool
-	}{
-		{
-			name: "success",
-			responseBody: map[string]interface{}{
-				"text": "This is a test transcript.",
-			},
-			responseStatus: http.StatusOK,
-			wantText:       "This is a test transcript.",
-			wantErr:        false,
-		},
-		{
-			name:           "api error",
-			responseBody:   "error",
-			responseStatus: http.StatusInternalServerError,
-			wantErr:        true,
-		},
-		{
-			name:           "malformed JSON",
-			responseBody:   "{badjson}",
-			responseStatus: http.StatusOK,
-			wantErr:        true,
-		},
-		{
-			name:           "missing field",
-			responseBody:   `{}`,
-			responseStatus: http.StatusOK,
-			wantText:       "",
-			wantErr:        false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tc.responseStatus)
-				switch b := tc.responseBody.(type) {
-				case string:
-					w.Write([]byte(b))
-				case nil:
-					// Should skip, not used here
-				default:
-					json.NewEncoder(w).Encode(b)
-				}
-			}))
-			defer srv.Close()
-
-			g := NewFAL(srv.URL, srv.URL, srv.URL, "test-api-key")
-			ctx := t.Context()
-
-			got, err := g.GenerateFromAudio(ctx, "http://audio-url.com/audio.wav")
-			if tc.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.wantText, got)
 			}
 		})
 	}

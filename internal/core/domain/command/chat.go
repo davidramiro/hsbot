@@ -18,12 +18,15 @@ import (
 )
 
 type Chat struct {
-	textGenerator port.TextGenerator
-	textSender    port.TextSender
-	transcriber   port.Transcriber
-	cacheDuration time.Duration
-	command       string
-	cache         *sync.Map
+	textGenerator  port.TextGenerator
+	textSender     port.TextSender
+	transcriber    port.Transcriber
+	audioGenerator port.AudioGenerator
+	audioSender    port.AudioSender
+	cacheDuration  time.Duration
+	command        string
+	speakCommand   string
+	cache          *sync.Map
 
 	track service.Tracker
 	l     *zerolog.Logger
@@ -37,29 +40,39 @@ type Conversation struct {
 }
 
 type ChatParams struct {
-	TextGenerator port.TextGenerator
-	TextSender    port.TextSender
-	Transcriber   port.Transcriber
-	Command       string
-	CacheDuration time.Duration
-	Track         service.Tracker
+	TextGenerator  port.TextGenerator
+	TextSender     port.TextSender
+	Transcriber    port.Transcriber
+	AudioGenerator port.AudioGenerator
+	AudioSender    port.AudioSender
+	Command        string
+	SpeakCommand   string
+	CacheDuration  time.Duration
+	Track          service.Tracker
 }
 
 func NewChat(p ChatParams) (*Chat, error) {
+	if p.SpeakCommand != "" && (p.AudioGenerator == nil || p.AudioSender == nil) {
+		return nil, errors.New("spoken replies require audio generator and sender")
+	}
+
 	logger := log.With().
 		Str("command", p.Command).
 		Str("handler", "chat").
 		Logger()
 
 	h := &Chat{
-		textGenerator: p.TextGenerator,
-		textSender:    p.TextSender,
-		transcriber:   p.Transcriber,
-		cacheDuration: p.CacheDuration,
-		command:       p.Command,
-		cache:         &sync.Map{},
-		track:         p.Track,
-		l:             &logger,
+		textGenerator:  p.TextGenerator,
+		textSender:     p.TextSender,
+		transcriber:    p.Transcriber,
+		audioGenerator: p.AudioGenerator,
+		audioSender:    p.AudioSender,
+		cacheDuration:  p.CacheDuration,
+		command:        p.Command,
+		speakCommand:   p.SpeakCommand,
+		cache:          &sync.Map{},
+		track:          p.Track,
+		l:              &logger,
 	}
 
 	return h, nil
@@ -91,7 +104,11 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 		return nil
 	}
 
-	go c.textSender.SendChatAction(ctx, message.ChatID, domain.Typing)
+	action := domain.Typing
+	if c.shallSpeak(message) {
+		action = domain.RecordingVoiceAction
+	}
+	go c.textSender.SendChatAction(ctx, message.ChatID, action)
 
 	promptText, err := c.extractPrompt(ctx, message)
 	if err != nil {
@@ -141,15 +158,34 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 	conversation.messages = append(conversation.messages,
 		domain.Prompt{Author: domain.System, Prompt: response.Response})
 
-	_, err = c.textSender.SendMessageReply(ctx,
-		message,
-		response.Response)
-	if err != nil {
+	if err := c.sendResponse(ctx, message, response.Response); err != nil {
 		return err
 	}
 
 	if viper.GetBool("bot.debug_replies") {
 		go c.sendDebugInfo(message, response.Metadata, len(conversation.messages))
+	}
+
+	return nil
+}
+
+func (c *Chat) shallSpeak(message *domain.Message) bool {
+	return c.speakCommand != "" && ParseCommand(message.Text) == c.speakCommand
+}
+
+func (c *Chat) sendResponse(ctx context.Context, message *domain.Message, text string) error {
+	if !c.shallSpeak(message) {
+		_, err := c.textSender.SendMessageReply(ctx, message, text)
+		return err
+	}
+
+	audio, err := c.audioGenerator.GenerateSpeech(ctx, text)
+	if err != nil {
+		return c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to generate speech: %w", err), message)
+	}
+
+	if err := c.audioSender.SendAudioReply(ctx, message, audio); err != nil {
+		return c.textSender.NotifyAndReturnError(ctx, fmt.Errorf("failed to send voice: %w", err), message)
 	}
 
 	return nil
@@ -212,9 +248,6 @@ convo size: %d | cost: %f`,
 
 func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (string, error) {
 	promptText := ParseCommandArgs(message.Text)
-	if promptText == "" {
-		return "", domain.ErrEmptyPrompt
-	}
 
 	if message.AudioURL != "" {
 		transcript, err := c.transcriber.GenerateFromAudio(ctx, message.AudioURL)
@@ -222,7 +255,15 @@ func (c *Chat) extractPrompt(ctx context.Context, message *domain.Message) (stri
 			return "", fmt.Errorf("failed to generate transcript: %w", err)
 		}
 
-		promptText += ": " + transcript
+		if promptText == "" {
+			promptText = transcript
+		} else {
+			promptText += ": " + transcript
+		}
+	}
+
+	if promptText == "" {
+		return "", domain.ErrEmptyPrompt
 	}
 
 	promptText = message.Username + ": " + promptText

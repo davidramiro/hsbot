@@ -63,13 +63,7 @@ func main() {
 }
 
 func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
-	or, err := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
-		viper.GetString("chat.system_prompt"))
-	if err != nil {
-		log.Panic().Err(err).Msg("failed initializing openrouter generator")
-	}
-
-	magick, err := converter.NewMagick()
+	magick, err := converter.NewMagick(ctx)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
@@ -77,20 +71,28 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	fal := generator.NewFAL(
 		viper.GetString("fal.image_gen_url"),
 		viper.GetString("fal.image_edit_url"),
-		viper.GetString("fal.whisper_url"),
 		viper.GetString("fal.api_key"))
+
+	or, err := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
+		viper.GetString("chat.system_prompt"))
+	if err != nil {
+		log.Panic().Err(err).Msg("failed initializing openrouter generator")
+	}
 
 	registry := &command.Registry{}
 
 	track := service.NewUsageTracker(ctx, t)
 
 	chat, err := command.NewChat(command.ChatParams{
-		TextGenerator: or,
-		TextSender:    t,
-		Transcriber:   fal,
-		Command:       "/chat",
-		CacheDuration: viper.GetDuration("chat.context_timeout"),
-		Track:         track,
+		TextGenerator:  or,
+		TextSender:     t,
+		Transcriber:    or,
+		AudioGenerator: or,
+		AudioSender:    t,
+		Command:        "/chat",
+		SpeakCommand:   "/speak",
+		CacheDuration:  viper.GetDuration("chat.context_timeout"),
+		Track:          track,
 	})
 
 	if err != nil {
@@ -98,11 +100,12 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	}
 
 	registry.Register(chat)
+	registry.RegisterAlias("/speak", chat)
 	registry.Register(command.NewModels(or, t, "/models"))
 	registry.Register(command.NewImage(fal, t, t, track, "/image"))
 	registry.Register(command.NewEdit(fal, t, t, track, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
-	registry.Register(command.NewTranscribe(fal, t, "/transcribe"))
+	registry.Register(command.NewTranscribe(or, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
 	registry.Register(command.NewDebug(t, "/debug"))
 	registry.Register(command.NewSpent(track, t, "/spent"))

@@ -16,6 +16,7 @@ Copy `config.sample.toml` to `config.toml` and set your keys/options.
 - `/chat`: Keeping conversation context for a duration defined in the config, this handler uses OpenRouter to generate
 chat responses. Use `#keyword` in a message to target a specific model. Also works with replying to images, 
 when using a model that supports vision.
+- `/speak`: Same as `/chat`, but replies with voice.
 - `/models`: Show a list of currently active models for `/chat`.
 - `/image`: Generating images from a prompt, set to use Flux as default.
 - `/edit`: Edit images via prompt

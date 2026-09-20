@@ -29,8 +29,9 @@ type Message struct {
 type Action string
 
 const (
-	Typing       Action = "typing"
-	SendingPhoto Action = "sending_photo"
+	Typing               Action = "typing"
+	SendingPhoto         Action = "sending_photo"
+	RecordingVoiceAction Action = "recording_voice"
 )
 
 type ModelResponse struct {
