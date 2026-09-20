@@ -23,7 +23,7 @@ func (m *MockResponder) GetCommand() string {
 }
 
 func TestRegister(t *testing.T) {
-	cr := &Registry{}
+	cr := NewRegistry()
 	mr := &MockResponder{command: "/test"}
 
 	cr.Register(mr)
@@ -48,7 +48,7 @@ func TestGetNotRegistered(t *testing.T) {
 	cr := &Registry{}
 
 	_, err := cr.Get("test")
-	require.Errorf(t, err, "can't fetch command, registry not initialized")
+	require.ErrorIs(t, err, ErrRegistryNotInitialized)
 }
 
 func TestGetCommandNotFound(t *testing.T) {
@@ -59,7 +59,7 @@ func TestGetCommandNotFound(t *testing.T) {
 	assert.Len(t, cr.commands, 1)
 
 	_, err := cr.Get("/foo")
-	require.Errorf(t, err, "command not found")
+	require.ErrorIs(t, err, domain.ErrCommandNotFound)
 }
 
 func TestGetCommandFound(t *testing.T) {

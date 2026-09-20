@@ -17,7 +17,7 @@ type MockImageGenerator struct {
 	Message string
 }
 
-func (m *MockImageGenerator) GenerateImage(_ context.Context, prompt string) (domain.GeneratedImage, error) {
+func (m *MockImageGenerator) NewImage(_ context.Context, prompt string) (domain.GeneratedImage, error) {
 	m.Message = prompt
 	return domain.GeneratedImage{Data: m.data, Cost: 0.01}, m.err
 }

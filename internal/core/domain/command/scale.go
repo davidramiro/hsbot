@@ -8,8 +8,6 @@ import (
 	"hsbot/internal/core/port"
 	"strconv"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type Scale struct {
@@ -30,21 +28,13 @@ func (s *Scale) GetCommand() string {
 }
 
 func (s *Scale) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
-	l := log.With().
-		Int("messageId", message.ID).
-		Int64("chatId", message.ChatID).
-		Str("command", s.GetCommand()).
-		Logger()
-
-	l.Info().Msg("handling request")
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel, _ := beginRespond(ctx, timeout, message, s.GetCommand())
 	defer cancel()
 
 	go s.textSender.SendChatAction(ctx, message.ChatID, domain.SendingPhoto)
 
 	if message.ImageURL == "" {
-		_ = s.textSender.NotifyAndReturnError(ctx, errors.New("missing image"), message)
+		_ = s.textSender.NotifyAndReturnError(ctx, domain.ErrMissingImage, message)
 		return nil
 	}
 

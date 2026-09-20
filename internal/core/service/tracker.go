@@ -9,14 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
-
-type Tracker interface {
-	AddCost(chatID int64, cost float64)
-	CheckLimit(ctx context.Context, chatID int64) bool
-	GetSpent(chatID int64) float64
-}
 
 type UsageTracker struct {
 	chats      map[int64]float64
@@ -25,11 +18,11 @@ type UsageTracker struct {
 	sender     port.TextSender
 }
 
-func NewUsageTracker(ctx context.Context, sender port.TextSender) *UsageTracker {
+func NewUsageTracker(ctx context.Context, sender port.TextSender, dailyLimit float64) *UsageTracker {
 	ut := &UsageTracker{
 		chats:      make(map[int64]float64),
 		sender:     sender,
-		dailyLimit: viper.GetFloat64("telegram.daily_spend_limit"),
+		dailyLimit: dailyLimit,
 	}
 
 	go ut.ResetDailyLimit(ctx)
@@ -46,7 +39,11 @@ func (t *UsageTracker) AddCost(chatID int64, cost float64) {
 const overLimit = "You have exceeded your daily spending limit: $%.2f. Limit will reset in %s."
 
 func (t *UsageTracker) CheckLimit(ctx context.Context, chatID int64) bool {
-	if t.chats[chatID] > t.dailyLimit {
+	t.mutex.Lock()
+	spent := t.chats[chatID]
+	t.mutex.Unlock()
+
+	if spent > t.dailyLimit {
 		_, err := t.sender.SendMessageReply(ctx,
 			&domain.Message{ChatID: chatID},
 			fmt.Sprintf(overLimit, t.dailyLimit, time.Until(getNextResetTime()).Truncate(time.Second)))

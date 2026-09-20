@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"hsbot/internal/core/domain"
+	"net/http"
+	"net/http/httptest"
 	"testing"
-
-	"github.com/spf13/viper"
 
 	"github.com/stretchr/testify/require"
 
@@ -56,51 +56,46 @@ func (m *mockClient) CreateImages(ctx context.Context,
 }
 
 func TestNewOpenRouter(t *testing.T) {
-	orig := viper.Get("openrouter.models")
-	defer viper.Set("openrouter.models", orig)
-
-	mockedModels := []map[string]interface{}{
-		{"Keyword": "gpt", "Identifier": "openai/gpt-4.1", "Default": 1},
-		{"Keyword": "claude", "Identifier": "anthropic/claude-sonnet-4", "Default": 2},
+	expectedModels := []domain.Model{
+		{Keyword: "gpt", Identifier: "openai/gpt-4.1", Default: 1},
+		{Keyword: "claude", Identifier: "anthropic/claude-sonnet-4", Default: 2},
 	}
 
-	var expectedModels []domain.Model
-	for _, m := range mockedModels {
-		expectedModels = append(expectedModels, domain.Model{
-			Keyword:    m["Keyword"].(string),
-			Identifier: m["Identifier"].(string),
-			Default:    m["Default"].(int),
-		})
-	}
-	viper.Set("openrouter.models", expectedModels)
-	viper.Set("openrouter.voices", []domain.Model{
-		{Keyword: "default", Identifier: "voice-id", Default: 1},
+	or, err := NewOpenRouter(Config{
+		APIKey:       "fakeApiKey",
+		SystemPrompt: "system test",
+		TextModels:   expectedModels,
+		ImageModels: []domain.Model{
+			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+		},
+		Voices: []domain.Model{
+			{Keyword: "default", Identifier: "voice-id", Default: 1},
+		},
+		TTSModel: "tts-model",
+		STTModel: "stt-model",
 	})
-	viper.Set("openrouter.tts_model", "tts-model")
-	viper.Set("openrouter.stt_model", "stt-model")
-	viper.Set("openrouter.image_models", []domain.Model{
-		{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
-	})
-
-	apiKey := "fakeApiKey"
-	systemPrompt := "system test"
-	or, err := NewOpenRouter(apiKey, systemPrompt)
 
 	require.NoError(t, err)
 	assert.NotNil(t, or)
 	assert.Len(t, or.TextModels, 2)
 	assert.Equal(t, expectedModels, or.TextModels)
-	assert.Equal(t, systemPrompt, or.systemPrompt)
+	assert.Equal(t, "system test", or.systemPrompt)
 }
 
 func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte{0xff, 0xd8, 0xff})
+	}))
+	t.Cleanup(imgSrv.Close)
+
 	testCases := []struct {
 		name         string
 		systemPrompt string
 		prompts      []domain.Prompt
 		mockResp     openrouter.ChatCompletionResponse
 		mockErr      error
-		expectedResp domain.ModelResponse
+		expectedResp domain.GeneratedText
 		expectErr    bool
 	}{
 		{
@@ -124,7 +119,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					TotalTokens:      9,
 				},
 			},
-			expectedResp: domain.ModelResponse{
+			expectedResp: domain.GeneratedText{
 				Response: "hello!",
 				Metadata: domain.ResponseMetadata{
 					Model:            "openai/gpt-4.1",
@@ -159,7 +154,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					TotalTokens:      9,
 				},
 			},
-			expectedResp: domain.ModelResponse{
+			expectedResp: domain.GeneratedText{
 				Response: "hello!",
 				Metadata: domain.ResponseMetadata{
 					Model:            "openai/gpt-4.1",
@@ -188,7 +183,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 				{
 					Prompt:   "describe this",
 					Author:   domain.User,
-					ImageURL: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg",
+					ImageURL: imgSrv.URL,
 				},
 			},
 			mockResp: openrouter.ChatCompletionResponse{
@@ -203,7 +198,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 					TotalTokens:      10,
 				},
 			},
-			expectedResp: domain.ModelResponse{
+			expectedResp: domain.GeneratedText{
 				Response: "It's a cat.",
 				Metadata: domain.ResponseMetadata{
 					Model:            "openai/gpt-4.1",
@@ -418,7 +413,7 @@ func TestOpenRouter_GenerateSpeech(t *testing.T) {
 				voiceModels: []domain.Model{{Keyword: "default", Identifier: "voice-id"}},
 			}
 
-			got, err := gen.GenerateSpeech(t.Context(), "hello")
+			got, err := gen.Speak(t.Context(), "hello")
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -450,7 +445,7 @@ func TestOpenRouter_GenerateImage(t *testing.T) {
 		},
 	}
 
-	got, err := gen.GenerateImage(t.Context(), "a cat")
+	got, err := gen.NewImage(t.Context(), "a cat")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("image"), got.Data)
 	assert.InDelta(t, 0.011, got.Cost, 1e-9)
@@ -477,7 +472,7 @@ func TestOpenRouter_GenerateImageKeyword(t *testing.T) {
 		},
 	}
 
-	got, err := gen.GenerateImage(t.Context(), "#gpt a cat")
+	got, err := gen.NewImage(t.Context(), "#gpt a cat")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("image"), got.Data)
 }
@@ -533,6 +528,6 @@ func TestOpenRouter_GenerateImageAPIError(t *testing.T) {
 		},
 	}
 
-	_, err := gen.GenerateImage(t.Context(), "a cat")
+	_, err := gen.NewImage(t.Context(), "a cat")
 	require.Error(t, err)
 }

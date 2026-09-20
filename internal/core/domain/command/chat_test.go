@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +18,8 @@ type MockTextGenerator struct {
 	Message         string
 }
 
-func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (domain.ModelResponse, error) {
-	return domain.ModelResponse{
+func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (domain.GeneratedText, error) {
+	return domain.GeneratedText{
 		Response: m.response,
 		Metadata: domain.ResponseMetadata{
 			Model:            "unit-test",
@@ -102,7 +100,7 @@ func TestChatHandlerSimpleSuccess(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -125,7 +123,7 @@ func TestChatHandlerTranscribeSuccess(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -133,10 +131,7 @@ func TestChatHandlerTranscribeSuccess(t *testing.T) {
 	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat transcribe", AudioURL: "foo"})
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation.messages, 2)
 
@@ -159,7 +154,7 @@ func TestChatHandlerTranscribeError(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -183,7 +178,7 @@ func TestChatHandlerErrorEmptyPrompt(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -201,22 +196,20 @@ func TestChatHandlerDebugMessage(t *testing.T) {
 	mt := &MockTranscriber{}
 	mtr := &MockTracker{withinLimit: true}
 
-	viper.SetDefault("bot.debug_replies", true)
-
 	chatHandler, _ := NewChat(ChatParams{
 		TextGenerator: mg,
 		TextSender:    ms,
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		DebugReplies:  true,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
 
 	err := chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 
-	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
 	assert.Equal(t, "debug:\nmodel: unit-test | retries: 0\nc tokens: 24 | total tokens: 42\n"+
 		"convo size: 2 | cost: 0.420000", ms.Message)
@@ -234,10 +227,8 @@ func TestChatHandlerClearingCache(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
-
-	viper.SetDefault("bot.debug_replies", false)
 
 	assert.NotNil(t, chatHandler)
 
@@ -246,16 +237,13 @@ func TestChatHandlerClearingCache(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation.messages, 2)
 
 	time.Sleep(time.Second * 4)
 
-	_, ok = chatHandler.cache.Load(int64(1))
+	_, ok = chatHandler.conversations.get(1)
 	assert.False(t, ok)
 }
 
@@ -271,10 +259,8 @@ func TestChatHandlerCache(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
-
-	viper.SetDefault("bot.debug_replies", false)
 
 	assert.NotNil(t, chatHandler)
 
@@ -284,21 +270,13 @@ func TestChatHandlerCache(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
 
-	size := 0
-	chatHandler.cache.Range(func(_, _ interface{}) bool {
-		size++
-		return true
-	})
-	assert.Equal(t, 1, size)
+	assert.Equal(t, 1, chatHandler.conversations.len())
 
 	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
 	require.NoError(t, err)
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation.messages, 4)
 
@@ -320,10 +298,8 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
-
-	viper.SetDefault("bot.debug_replies", false)
 
 	assert.NotNil(t, chatHandler)
 
@@ -337,24 +313,13 @@ func TestChatHandlerCacheMultipleConversations(t *testing.T) {
 		ChatID: 2, ID: 2, Username: "@unit", Text: "/chat prompt chat id 2"})
 	require.NoError(t, err)
 
-	size := 0
-	chatHandler.cache.Range(func(_, _ interface{}) bool {
-		size++
-		return true
-	})
-	assert.Equal(t, 2, size)
+	assert.Equal(t, 2, chatHandler.conversations.len())
 
-	c1, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation1, ok := c1.(*Conversation)
+	conversation1, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation1.messages, 2)
 
-	c2, ok := chatHandler.cache.Load(int64(2))
-	require.True(t, ok)
-
-	conversation2, ok := c2.(*Conversation)
+	conversation2, ok := chatHandler.conversations.get(2)
 	require.True(t, ok)
 	assert.Len(t, conversation2.messages, 2)
 
@@ -376,10 +341,8 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
-
-	viper.SetDefault("bot.debug_replies", false)
 
 	assert.NotNil(t, chatHandler)
 
@@ -389,12 +352,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "mock response", ms.Message)
 
-	size := 0
-	chatHandler.cache.Range(func(_, _ interface{}) bool {
-		size++
-		return true
-	})
-	assert.Equal(t, 1, size)
+	assert.Equal(t, 1, chatHandler.conversations.len())
 
 	time.Sleep(time.Second * 2)
 
@@ -402,12 +360,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt2"})
 	require.NoError(t, err)
 
-	size = 0
-	chatHandler.cache.Range(func(_, _ interface{}) bool {
-		size++
-		return true
-	})
-	assert.Equal(t, 1, size)
+	assert.Equal(t, 1, chatHandler.conversations.len())
 
 	time.Sleep(time.Second * 2)
 
@@ -415,10 +368,7 @@ func TestChatHandlerCacheResetTimeout(t *testing.T) {
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/chat prompt3"})
 	require.NoError(t, err)
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation.messages, 6)
 
@@ -442,7 +392,7 @@ func TestGeneratorError(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -465,7 +415,7 @@ func TestEmptyPromptError(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -488,7 +438,7 @@ func TestSendMessageError(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -511,7 +461,7 @@ func TestSendGenerateErrorAndMessageError(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 
 	assert.NotNil(t, chatHandler)
@@ -531,8 +481,6 @@ func TestNewChatSpokenRequiresAudio(t *testing.T) {
 }
 
 func TestChatHandlerSpeakSuccess(t *testing.T) {
-	viper.Set("bot.debug_replies", false)
-
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
@@ -549,7 +497,7 @@ func TestChatHandlerSpeakSuccess(t *testing.T) {
 		Command:        "/chat",
 		SpeakCommand:   "/speak",
 		CacheDuration:  time.Second * 3,
-		Track:          mtr,
+		Tracker:        mtr,
 	})
 	require.NoError(t, err)
 
@@ -560,8 +508,6 @@ func TestChatHandlerSpeakSuccess(t *testing.T) {
 }
 
 func TestChatHandlerSpeakSharesContextWithChat(t *testing.T) {
-	viper.Set("bot.debug_replies", false)
-
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
@@ -578,7 +524,7 @@ func TestChatHandlerSpeakSharesContextWithChat(t *testing.T) {
 		Command:        "/chat",
 		SpeakCommand:   "/speak",
 		CacheDuration:  time.Second * 3,
-		Track:          mtr,
+		Tracker:        mtr,
 	})
 	require.NoError(t, err)
 
@@ -590,18 +536,13 @@ func TestChatHandlerSpeakSharesContextWithChat(t *testing.T) {
 		ChatID: 1, ID: 2, Username: "@unit", Text: "/speak prompt2"})
 	require.NoError(t, err)
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Len(t, conversation.messages, 4)
 	assert.Equal(t, []byte("mp3"), mas.file)
 }
 
 func TestChatHandlerSpeakGeneratorError(t *testing.T) {
-	viper.Set("bot.debug_replies", false)
-
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
@@ -618,7 +559,7 @@ func TestChatHandlerSpeakGeneratorError(t *testing.T) {
 		Command:        "/chat",
 		SpeakCommand:   "/speak",
 		CacheDuration:  time.Second * 3,
-		Track:          mtr,
+		Tracker:        mtr,
 	})
 	require.NoError(t, err)
 
@@ -628,8 +569,6 @@ func TestChatHandlerSpeakGeneratorError(t *testing.T) {
 }
 
 func TestChatHandlerAudioOnlyPrompt(t *testing.T) {
-	viper.Set("bot.debug_replies", false)
-
 	mg := &MockTextGenerator{response: "mock response"}
 	ms := &MockTextSender{}
 	mt := &MockTranscriber{}
@@ -641,7 +580,7 @@ func TestChatHandlerAudioOnlyPrompt(t *testing.T) {
 		Transcriber:   mt,
 		Command:       "/chat",
 		CacheDuration: time.Second * 3,
-		Track:         mtr,
+		Tracker:       mtr,
 	})
 	require.NoError(t, err)
 
@@ -649,10 +588,7 @@ func TestChatHandlerAudioOnlyPrompt(t *testing.T) {
 		ChatID: 1, ID: 1, Username: "@unit", Text: "/chat", AudioURL: "foo"})
 	require.NoError(t, err)
 
-	c, ok := chatHandler.cache.Load(int64(1))
-	require.True(t, ok)
-
-	conversation, ok := c.(*Conversation)
+	conversation, ok := chatHandler.conversations.get(1)
 	require.True(t, ok)
 	assert.Equal(t, "@unit: foo", conversation.messages[0].Prompt)
 }

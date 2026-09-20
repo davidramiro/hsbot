@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"hsbot/internal/adapters/file"
 	"hsbot/internal/core/domain"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 
 	"github.com/revrost/go-openrouter"
 )
@@ -42,66 +40,48 @@ type OpenRouterClient interface {
 		request openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error)
 }
 
-func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
-	or := &OpenRouter{
-		systemPrompt: systemPrompt,
-		client: openrouter.NewClient(
-			apiKey,
-			openrouter.WithXTitle("hsbot"),
-		),
-	}
+type Config struct {
+	APIKey       string
+	SystemPrompt string
+	TextModels   []domain.Model
+	ImageModels  []domain.Model
+	Voices       []domain.Model
+	TTSModel     string
+	STTModel     string
+}
 
-	models, defaultModels, err := unmarshalModels("openrouter.models")
-	if err != nil {
-		log.Error().Err(err).Msg("failed to unmarshal openrouter models from config")
-		return nil, err
-	}
-
-	if len(defaultModels) == 0 {
+func NewOpenRouter(cfg Config) (*OpenRouter, error) {
+	textModels, defaultTextModels := splitDefaults(cfg.TextModels)
+	if len(defaultTextModels) == 0 {
 		return nil, errors.New("no default model found")
 	}
 
-	or.TextModels = models
-	or.defaultTextModels = defaultModels
-
-	imageModels, defaultImageModels, err := unmarshalModels("openrouter.image_models")
-	if err != nil {
-		log.Error().Err(err).Msg("failed to unmarshal openrouter image models from config")
-		return nil, err
-	}
-
+	imageModels, defaultImageModels := splitDefaults(cfg.ImageModels)
 	if len(defaultImageModels) == 0 {
 		return nil, errors.New("no default image model found")
 	}
 
-	or.imageModels = imageModels
-	or.defaultImageModels = defaultImageModels
-
-	or.ttsModel = viper.GetString("openrouter.tts_model")
-	or.sttModel = viper.GetString("openrouter.stt_model")
-
-	var voices []domain.Model
-	err = viper.UnmarshalKey("openrouter.voices", &voices)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to unmarshal openrouter voices from config")
-		return nil, err
-	}
-
-	or.voiceModels = voices
-
-	if len(or.voiceModels) == 0 {
+	if len(cfg.Voices) == 0 {
 		return nil, errors.New("no voice models found")
 	}
 
-	return or, nil
+	return &OpenRouter{
+		systemPrompt: cfg.SystemPrompt,
+		client: openrouter.NewClient(
+			cfg.APIKey,
+			openrouter.WithXTitle("hsbot"),
+		),
+		TextModels:         textModels,
+		defaultTextModels:  defaultTextModels,
+		imageModels:        imageModels,
+		defaultImageModels: defaultImageModels,
+		voiceModels:        cfg.Voices,
+		ttsModel:           cfg.TTSModel,
+		sttModel:           cfg.STTModel,
+	}, nil
 }
 
-func unmarshalModels(key string) ([]domain.Model, []domain.Model, error) {
-	var models []domain.Model
-	if err := viper.UnmarshalKey(key, &models); err != nil {
-		return nil, nil, err
-	}
-
+func splitDefaults(models []domain.Model) ([]domain.Model, []domain.Model) {
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].Default < models[j].Default
 	})
@@ -113,11 +93,15 @@ func unmarshalModels(key string) ([]domain.Model, []domain.Model, error) {
 		}
 	}
 
-	return models, defaults, nil
+	return models, defaults
+}
+
+func (o *OpenRouter) ListTextModels() []domain.Model {
+	return o.TextModels
 }
 
 func (o *OpenRouter) GenerateFromPrompt(
-	ctx context.Context, prompts []domain.Prompt) (domain.ModelResponse, error) {
+	ctx context.Context, prompts []domain.Prompt) (domain.GeneratedText, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(prompts)+1)
 
 	messages[0] = openrouter.ChatCompletionMessage{
@@ -139,7 +123,7 @@ func (o *OpenRouter) GenerateFromPrompt(
 		case domain.User:
 			msg, err := createUserMessage(ctx, prompt)
 			if err != nil {
-				return domain.ModelResponse{}, fmt.Errorf("could not create openrouter response: %w", err)
+				return domain.GeneratedText{}, fmt.Errorf("could not create openrouter response: %w", err)
 			}
 			messages[i+1] = msg
 		}
@@ -163,7 +147,7 @@ func (o *OpenRouter) GenerateFromPrompt(
 const ORProviderError = "Provider returned error"
 
 func (o *OpenRouter) retryCompletion(ctx context.Context,
-	ccr openrouter.ChatCompletionRequest) (domain.ModelResponse, error) {
+	ccr openrouter.ChatCompletionRequest) (domain.GeneratedText, error) {
 	for i := -1; i < len(o.defaultTextModels); i++ {
 		if ccr.Model == "" {
 			// no specific model requested, start with first index from default models
@@ -180,10 +164,10 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 			if strings.Contains(err.Error(), ORProviderError) {
 				continue
 			}
-			return domain.ModelResponse{}, fmt.Errorf("openrouter API error: %w", err)
+			return domain.GeneratedText{}, fmt.Errorf("openrouter API error: %w", err)
 		}
 
-		return domain.ModelResponse{
+		return domain.GeneratedText{
 			Response: resp.Choices[0].Message.Content.Text,
 			Metadata: domain.ResponseMetadata{
 				Model:            resp.Model,
@@ -195,93 +179,71 @@ func (o *OpenRouter) retryCompletion(ctx context.Context,
 		}, nil
 	}
 
-	return domain.ModelResponse{},
+	return domain.GeneratedText{},
 		fmt.Errorf("failed to get a response from openrouter, retry count: %d", len(o.defaultTextModels)-1)
 }
 
 func createUserMessage(ctx context.Context, prompt domain.Prompt) (openrouter.ChatCompletionMessage, error) {
-	if prompt.ImageURL != "" {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, prompt.ImageURL, nil)
-		if err != nil {
-			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not create image dl request: %w", err)
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not download image: %w", err)
-		}
-
-		defer resp.Body.Close()
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not read image bytes: %w", err)
-		}
-
-		// Detect the actual type (image/jpeg, image/png, etc.)
-		mimeType := http.DetectContentType(data)
-
-		// Encode to Base64
-		encoded := base64.StdEncoding.EncodeToString(data)
-
+	if prompt.ImageURL == "" {
 		return openrouter.ChatCompletionMessage{
 			Role: openrouter.ChatMessageRoleUser,
-			Content: openrouter.Content{Multi: []openrouter.ChatMessagePart{
-				{
-					Type: openrouter.ChatMessagePartTypeImageURL,
-					ImageURL: &openrouter.ChatMessageImageURL{URL: fmt.Sprintf("data:%s;base64,%s",
-						mimeType, encoded)},
-				},
-				{
-					Type: openrouter.ChatMessagePartTypeText,
-					Text: prompt.Prompt,
-				},
-			},
+			Content: openrouter.Content{
+				Text: prompt.Prompt,
 			},
 		}, nil
 	}
 
+	data, err := file.DownloadFile(ctx, prompt.ImageURL)
+	if err != nil {
+		return openrouter.ChatCompletionMessage{}, fmt.Errorf("could not download image: %w", err)
+	}
+
+	mimeType := http.DetectContentType(data)
+	encoded := base64.StdEncoding.EncodeToString(data)
+
 	return openrouter.ChatCompletionMessage{
 		Role: openrouter.ChatMessageRoleUser,
-		Content: openrouter.Content{
-			Text: prompt.Prompt,
+		Content: openrouter.Content{Multi: []openrouter.ChatMessagePart{
+			{
+				Type: openrouter.ChatMessagePartTypeImageURL,
+				ImageURL: &openrouter.ChatMessageImageURL{URL: fmt.Sprintf("data:%s;base64,%s",
+					mimeType, encoded)},
+			},
+			{
+				Type: openrouter.ChatMessagePartTypeText,
+				Text: prompt.Prompt,
+			},
+		},
 		},
 	}, nil
 }
 
-func (o *OpenRouter) findModelByMessage(message *string) domain.Model {
-	for _, model := range o.TextModels {
-		lowercaseMessage := strings.ToLower(*message)
+func findModelByKeyword(models []domain.Model, message *string, fallback domain.Model) domain.Model {
+	lowercaseMessage := strings.ToLower(*message)
+	for _, model := range models {
 		lowerCaseModel := strings.ToLower("#" + model.Keyword)
-		if strings.Contains(lowercaseMessage, lowerCaseModel) {
-			i := strings.Index(lowercaseMessage, lowerCaseModel)
+		if i := strings.Index(lowercaseMessage, lowerCaseModel); i != -1 {
 			*message = (*message)[:i] + (*message)[i+len(lowerCaseModel):]
 			return model
 		}
 	}
 
-	return domain.Model{}
+	return fallback
+}
+
+func (o *OpenRouter) findModelByMessage(message *string) domain.Model {
+	return findModelByKeyword(o.TextModels, message, domain.Model{})
 }
 
 func (o *OpenRouter) findImageModel(message *string) domain.Model {
-	for _, model := range o.imageModels {
-		lowercaseMessage := strings.ToLower(*message)
-		lowerCaseModel := strings.ToLower("#" + model.Keyword)
-		if strings.Contains(lowercaseMessage, lowerCaseModel) {
-			i := strings.Index(lowercaseMessage, lowerCaseModel)
-			*message = (*message)[:i] + (*message)[i+len(lowerCaseModel):]
-			return model
-		}
-	}
-
+	fallback := domain.Model{}
 	if len(o.defaultImageModels) > 0 {
-		return o.defaultImageModels[0]
+		fallback = o.defaultImageModels[0]
 	}
-
-	return domain.Model{}
+	return findModelByKeyword(o.imageModels, message, fallback)
 }
 
-func (o *OpenRouter) GenerateImage(ctx context.Context, prompt string) (domain.GeneratedImage, error) {
+func (o *OpenRouter) NewImage(ctx context.Context, prompt string) (domain.GeneratedImage, error) {
 	return o.createImage(ctx, prompt, "")
 }
 
@@ -342,9 +304,9 @@ func imageFromResponse(resp openrouter.ImageGenerationResponse) (domain.Generate
 	return domain.GeneratedImage{Data: data, Cost: cost}, nil
 }
 
-func (o *OpenRouter) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
+func (o *OpenRouter) Speak(ctx context.Context, text string) (domain.GeneratedAudio, error) {
 	if len(o.voiceModels) == 0 {
-		return nil, errors.New("no voice models configured")
+		return domain.GeneratedAudio{}, errors.New("no voice models configured")
 	}
 
 	result, err := o.client.CreateSpeech(ctx, openrouter.SpeechRequest{
@@ -354,27 +316,37 @@ func (o *OpenRouter) GenerateSpeech(ctx context.Context, text string) ([]byte, e
 		ResponseFormat: openrouter.SpeechResponseFormatMp3,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("openrouter speech API error: %w", err)
+		return domain.GeneratedAudio{}, fmt.Errorf("openrouter speech API error: %w", err)
 	}
 
-	return result.Audio, nil
+	return domain.GeneratedAudio{
+		Data: result.Audio,
+		// TODO: openrouter does not return usage on speech api yet. ballpark...
+		Cost: 0.001,
+	}, nil
 }
 
-func (o *OpenRouter) GenerateFromAudio(ctx context.Context, url string) (string, error) {
+func (o *OpenRouter) GenerateFromAudio(ctx context.Context, url string) (domain.GeneratedText, error) {
 	f, err := file.DownloadFile(ctx, url)
 	if err != nil {
-		return "", fmt.Errorf("failed to download audio: %w", err)
+		return domain.GeneratedText{}, fmt.Errorf("failed to download audio: %w", err)
 	}
 
-	resp, err := o.client.CreateTranscription(ctx, openrouter.TranscriptionRequest{
+	res, err := o.client.CreateTranscription(ctx, openrouter.TranscriptionRequest{
 		Model:      o.sttModel,
 		InputAudio: openrouter.NewTranscriptionInputAudio(f, openrouter.AudioFormatOgg),
 	})
 	if err != nil {
-		return "", fmt.Errorf("openrouter transcription API error: %w", err)
+		return domain.GeneratedText{}, fmt.Errorf("openrouter transcription API error: %w", err)
 	}
 
-	log.Debug().Interface("result", resp.Text).Msg("openrouter transcript")
+	resp := domain.GeneratedText{Response: res.Text}
 
-	return resp.Text, nil
+	if res.Usage != nil {
+		resp.Metadata.Cost = res.Usage.Cost
+	}
+
+	log.Debug().Interface("result", resp.Response).Msg("openrouter transcript")
+
+	return resp, nil
 }

@@ -9,8 +9,6 @@ import (
 	"runtime/debug"
 	"runtime/metrics"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type Debug struct {
@@ -35,12 +33,9 @@ compiled with %s for %s-%s
 `
 const metricCount = 3
 
-func (d *Debug) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
-	l := log.With().
-		Int("messageId", message.ID).
-		Int64("chatId", message.ChatID).
-		Str("command", d.GetCommand()).
-		Logger()
+func (d *Debug) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+	ctx, cancel, _ := beginRespond(ctx, timeout, message, d.GetCommand())
+	defer cancel()
 
 	data := make([]metrics.Sample, metricCount)
 	data[0] = metrics.Sample{Name: "/memory/classes/heap/objects:bytes"}
@@ -48,8 +43,6 @@ func (d *Debug) Respond(ctx context.Context, _ time.Duration, message *domain.Me
 	data[2] = metrics.Sample{Name: "/memory/classes/total:bytes"}
 
 	metrics.Read(data)
-
-	l.Info().Msg("handling request")
 
 	var goos, goarch string
 	if info, ok := debug.ReadBuildInfo(); ok {

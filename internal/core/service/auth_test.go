@@ -9,7 +9,6 @@ import (
 
 	"hsbot/internal/core/domain"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,59 +38,15 @@ func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, 
 }
 
 func TestNewAuthorizer(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func()
-		wantErr  bool
-		expected []int64
-	}{
-		{
-			name: "loads allowed chat IDs",
-			setup: func() {
-				viper.Set("telegram.allowed_chat_ids", []int64{1, 2, 3})
-			},
-			wantErr:  false,
-			expected: []int64{1, 2, 3},
-		},
-		{
-			name: "invalid type returns error",
-			setup: func() {
-				viper.Set("telegram.allowed_chat_ids", "not a slice")
-			},
-			wantErr: true,
-		},
-		{
-			name: "empty list is fine",
-			setup: func() {
-				viper.Set("telegram.allowed_chat_ids", []int64{})
-			},
-			wantErr:  false,
-			expected: []int64{},
-		},
-	}
+	auth := NewAuthorizer(&mockTextSender{}, []int64{1, 2, 3}, "adminuser")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset viper between tests
-			viper.Reset()
-			tt.setup()
-			auth, err := NewAuthorizer(&mockTextSender{})
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Nil(t, auth)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, auth)
-				assert.Equal(t, tt.expected, auth.allowlist)
-			}
-		})
-	}
+	require.NotNil(t, auth)
+	assert.Equal(t, []int64{1, 2, 3}, auth.allowlist)
+	assert.Equal(t, "adminuser", auth.adminUsername)
 }
 
 func TestChatAuthorizer_IsAuthorized(t *testing.T) {
 	adminUsername := "adminuser"
-	viper.Set("telegram.admin_username", adminUsername) // Set for forbidden message formatting
 
 	tests := []struct {
 		name         string
@@ -132,8 +87,9 @@ func TestChatAuthorizer_IsAuthorized(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSender := &mockTextSender{sendError: tt.sendErr}
 			a := &ChatAuthorizer{
-				allowlist: tt.allowlist,
-				sender:    mockSender,
+				allowlist:     tt.allowlist,
+				adminUsername: adminUsername,
+				sender:        mockSender,
 			}
 
 			ctx := t.Context()

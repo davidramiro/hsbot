@@ -2,28 +2,24 @@ package command
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
-	"hsbot/internal/core/service"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type Edit struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
-	track          service.Tracker
+	track          port.Tracker
 	command        string
 }
 
 func NewEdit(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	track service.Tracker,
+	track port.Tracker,
 	command string) *Edit {
 	return &Edit{imageGenerator: imageGenerator,
 		imageSender: imageSender,
@@ -37,16 +33,7 @@ func (e *Edit) GetCommand() string {
 }
 
 func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
-	l := log.With().
-		Int("messageId", message.ID).
-		Int64("chatId", message.ChatID).
-		Str("imageURL", message.ImageURL).
-		Str("command", e.GetCommand()).
-		Logger()
-
-	l.Info().Msg("handling request")
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel, l := beginRespond(ctx, timeout, message, e.GetCommand())
 	defer cancel()
 
 	if !e.track.CheckLimit(ctx, message.ChatID) {
@@ -58,12 +45,12 @@ func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *doma
 
 	prompt := ParseCommandArgs(message.Text)
 	if prompt == "" {
-		_ = e.textSender.NotifyAndReturnError(ctx, errors.New("empty prompt"), message)
+		_ = e.textSender.NotifyAndReturnError(ctx, domain.ErrMissingPrompt, message)
 		return nil
 	}
 
 	if message.ImageURL == "" {
-		_ = e.textSender.NotifyAndReturnError(ctx, errors.New("missing image"), message)
+		_ = e.textSender.NotifyAndReturnError(ctx, domain.ErrMissingImage, message)
 		return nil
 	}
 

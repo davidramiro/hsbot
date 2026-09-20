@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,7 +49,6 @@ func TestAddCost(t *testing.T) {
 
 func TestCheckLimit(t *testing.T) {
 	dailyLimit := 5.00
-	viper.Set("telegram.daily_spend_limit", dailyLimit)
 	tests := []struct {
 		name          string
 		chatID        int64
@@ -116,13 +114,12 @@ func TestCheckLimit(t *testing.T) {
 
 func TestNewUsageTracker(t *testing.T) {
 	dailyLimit := 10.00
-	viper.Set("telegram.daily_spend_limit", dailyLimit)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	mockSender := &mockTextSender{}
-	tracker := NewUsageTracker(ctx, mockSender)
+	tracker := NewUsageTracker(ctx, mockSender, dailyLimit)
 
 	assert.NotNil(t, tracker.chats)
 	assert.InDelta(t, dailyLimit, tracker.dailyLimit, 0.01)

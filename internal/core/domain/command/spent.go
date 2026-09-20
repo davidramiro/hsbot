@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
-	"hsbot/internal/core/service"
 	"time"
 )
 
 type Spent struct {
-	tracker service.Tracker
+	tracker port.Tracker
 	sender  port.TextSender
 	command string
 }
 
-func NewSpent(tracker service.Tracker, ts port.TextSender, command string) *Spent {
+func NewSpent(tracker port.Tracker, ts port.TextSender, command string) *Spent {
 	return &Spent{
 		tracker: tracker,
 		sender:  ts,

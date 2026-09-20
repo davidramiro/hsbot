@@ -34,12 +34,17 @@ const (
 	RecordingVoiceAction Action = "recording_voice"
 )
 
-type ModelResponse struct {
+type GeneratedText struct {
 	Response string
 	Metadata ResponseMetadata
 }
 
 type GeneratedImage struct {
+	Data []byte
+	Cost float64
+}
+
+type GeneratedAudio struct {
 	Data []byte
 	Cost float64
 }
