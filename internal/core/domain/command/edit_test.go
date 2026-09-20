@@ -48,7 +48,7 @@ func TestEditHandler_EmptyPrompt(t *testing.T) {
 
 	err := eh.Respond(t.Context(), time.Second, msg)
 	require.NoError(t, err)
-	assert.Equal(t, "empty prompt", mt.Message)
+	assert.Equal(t, "missing prompt", mt.Message)
 	assert.False(t, ms.called)
 }
 

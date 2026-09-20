@@ -12,19 +12,19 @@ type Edit struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
-	track          port.Tracker
+	tracker        port.Tracker
 	command        string
 }
 
 func NewEdit(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	track port.Tracker,
+	tracker port.Tracker,
 	command string) *Edit {
 	return &Edit{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
-		track:       track,
+		tracker:     tracker,
 		command:     command}
 }
 
@@ -36,7 +36,7 @@ func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *doma
 	ctx, cancel, l := beginRespond(ctx, timeout, message, e.GetCommand())
 	defer cancel()
 
-	if !e.track.CheckLimit(ctx, message.ChatID) {
+	if !e.tracker.CheckLimit(ctx, message.ChatID) {
 		l.Debug().Msg("spending limit reached")
 		return nil
 	}
@@ -60,7 +60,7 @@ func (e *Edit) Respond(ctx context.Context, timeout time.Duration, message *doma
 		return e.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	e.track.AddCost(message.ChatID, image.Cost)
+	e.tracker.AddCost(message.ChatID, image.Cost)
 
 	err = e.imageSender.SendImageFileReply(ctx, message, image.Data)
 	if err != nil {

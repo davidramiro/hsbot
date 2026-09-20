@@ -12,19 +12,19 @@ type Image struct {
 	imageGenerator port.ImageGenerator
 	imageSender    port.ImageSender
 	textSender     port.TextSender
-	track          port.Tracker
+	tracker        port.Tracker
 	command        string
 }
 
 func NewImage(imageGenerator port.ImageGenerator,
 	imageSender port.ImageSender,
 	textSender port.TextSender,
-	track port.Tracker,
+	tracker port.Tracker,
 	command string) *Image {
 	return &Image{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
-		track:       track,
+		tracker:     tracker,
 		command:     command}
 }
 
@@ -36,7 +36,7 @@ func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *dom
 	ctx, cancel, l := beginRespond(ctx, timeout, message, i.GetCommand())
 	defer cancel()
 
-	if !i.track.CheckLimit(ctx, message.ChatID) {
+	if !i.tracker.CheckLimit(ctx, message.ChatID) {
 		l.Debug().Msg("spending limit reached")
 		return nil
 	}
@@ -55,7 +55,7 @@ func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *dom
 		return i.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	i.track.AddCost(message.ChatID, image.Cost)
+	i.tracker.AddCost(message.ChatID, image.Cost)
 
 	err = i.imageSender.SendImageFileReply(ctx, message, image.Data)
 	if err != nil {

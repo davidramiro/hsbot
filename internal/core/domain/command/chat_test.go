@@ -59,8 +59,8 @@ type MockAudioGenerator struct {
 	err   error
 }
 
-func (m *MockAudioGenerator) GenerateSpeech(_ context.Context, _ string) ([]byte, error) {
-	return m.audio, m.err
+func (m *MockAudioGenerator) Speak(_ context.Context, _ string) (domain.GeneratedAudio, error) {
+	return domain.GeneratedAudio{Data: m.audio}, m.err
 }
 
 type MockAudioSender struct {

@@ -98,7 +98,7 @@ func TestImageRepondErrorEmptyPrompt(t *testing.T) {
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image"})
 	require.NoError(t, err)
 
-	assert.Equal(t, "missing image prompt", mt.Message)
+	assert.Equal(t, "missing prompt", mt.Message)
 }
 
 func TestImageRepondErrorGenerating(t *testing.T) {

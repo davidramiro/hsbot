@@ -5,7 +5,6 @@ import (
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/domain/command"
 	"hsbot/internal/core/port"
-	"hsbot/internal/core/service"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -16,10 +15,10 @@ import (
 type Command struct {
 	commandRegistry port.CommandRegistry
 	timeout         time.Duration
-	auth            service.Authorizer
+	auth            port.Authorizer
 }
 
-func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration, authorizer service.Authorizer) *Command {
+func NewCommand(commandRegistry port.CommandRegistry, timeout time.Duration, authorizer port.Authorizer) *Command {
 	return &Command{commandRegistry: commandRegistry, timeout: timeout, auth: authorizer}
 }
 
@@ -46,7 +45,7 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	replyToMessageID := new(int)
+	var replyToMessageID *int
 	var quotedText string
 	var isReplyToBot bool
 	var replyToUsername string
@@ -65,14 +64,9 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 			quotedText = update.Message.ReplyToMessage.Text
 		}
 
-		*replyToMessageID = update.Message.ReplyToMessage.ID
+		id := update.Message.ReplyToMessage.ID
+		replyToMessageID = &id
 	}
-
-	imageURL := make(chan string)
-	audioURL := make(chan string)
-
-	go getOptionalImage(ctx, b, update, imageURL)
-	go getOptionalAudio(ctx, b, update, audioURL)
 
 	go func() {
 		err := commandHandler.Respond(ctx, c.timeout, &domain.Message{
@@ -84,8 +78,8 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 			ReplyToUsername:  replyToUsername,
 			IsReplyToBot:     isReplyToBot,
 			QuotedText:       quotedText,
-			ImageURL:         <-imageURL,
-			AudioURL:         <-audioURL,
+			ImageURL:         getOptionalImage(ctx, b, update),
+			AudioURL:         getOptionalAudio(ctx, b, update),
 		})
 		if err != nil {
 			log.Err(err).Str("command", cmd).Msg("failed to respond to command")
@@ -93,7 +87,7 @@ func (c *Command) Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 	}()
 }
 
-func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
+func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update) string {
 	var photos []models.PhotoSize
 
 	if update.Message.Photo != nil {
@@ -107,21 +101,19 @@ func getOptionalImage(ctx context.Context, b *bot.Bot, update *models.Update, ur
 	}
 
 	if len(photos) == 0 {
-		url <- ""
-		return
+		return ""
 	}
 
 	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: findMediumSizedImage(photos)})
 	if err != nil {
 		log.Error().Msg("error getting file from telegram api")
-		url <- ""
-		return
+		return ""
 	}
 
-	url <- b.FileDownloadLink(f)
+	return b.FileDownloadLink(f)
 }
 
-func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, url chan<- string) {
+func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update) string {
 	var fileID string
 	if update.Message.Audio != nil {
 		fileID = update.Message.Audio.FileID
@@ -138,18 +130,16 @@ func getOptionalAudio(ctx context.Context, b *bot.Bot, update *models.Update, ur
 	}
 
 	if fileID == "" {
-		url <- ""
-		return
+		return ""
 	}
 
 	f, err := b.GetFile(ctx, &bot.GetFileParams{FileID: fileID})
 	if err != nil {
 		log.Error().Msg("error getting file from telegram api")
-		url <- ""
-		return
+		return ""
 	}
 
-	url <- b.FileDownloadLink(f)
+	return b.FileDownloadLink(f)
 }
 
 const minSize = 80000

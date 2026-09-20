@@ -326,7 +326,7 @@ func (o *OpenRouter) Speak(ctx context.Context, text string) (domain.GeneratedAu
 	}, nil
 }
 
-func (o *OpenRouter) GenerateFromAudio(ctx context.Context, url string) (domain.GeneratedText, error) {
+func (o *OpenRouter) Transcribe(ctx context.Context, url string) (domain.GeneratedText, error) {
 	f, err := file.DownloadFile(ctx, url)
 	if err != nil {
 		return domain.GeneratedText{}, fmt.Errorf("failed to download audio: %w", err)

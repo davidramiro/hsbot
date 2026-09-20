@@ -74,7 +74,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 
 	registry := command.NewRegistry()
 
-	track := service.NewUsageTracker(ctx, t, cfg.Telegram.DailySpendLimit)
+	tracker := service.NewUsageTracker(ctx, t, cfg.Telegram.DailySpendLimit)
 
 	chat, err := command.NewChat(command.ChatParams{
 		TextGenerator:  or,
@@ -86,7 +86,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 		SpeakCommand:   "/speak",
 		CacheDuration:  cfg.Chat.ContextTimeout,
 		DebugReplies:   cfg.DebugReplies,
-		Tracker:        track,
+		Tracker:        tracker,
 	})
 
 	if err != nil {
@@ -96,13 +96,13 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 	registry.Register(chat)
 	registry.RegisterAlias("/speak", chat)
 	registry.Register(command.NewModels(or, t, "/models"))
-	registry.Register(command.NewImage(or, t, t, track, "/image"))
-	registry.Register(command.NewEdit(or, t, t, track, "/edit"))
+	registry.Register(command.NewImage(or, t, t, tracker, "/image"))
+	registry.Register(command.NewEdit(or, t, t, tracker, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
-	registry.Register(command.NewTranscribe(or, t, "/transcribe"))
+	registry.Register(command.NewTranscribe(or, t, tracker, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))
 	registry.Register(command.NewDebug(t, "/debug"))
-	registry.Register(command.NewSpent(track, t, "/spent"))
+	registry.Register(command.NewSpent(tracker, t, "/spent"))
 	return registry
 }
 

@@ -419,7 +419,7 @@ func TestOpenRouter_GenerateSpeech(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.audio, got)
+			assert.Equal(t, tt.audio, got.Data)
 		})
 	}
 }
