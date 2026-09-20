@@ -163,7 +163,7 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 	}
 
 	if viper.GetBool("bot.debug_replies") {
-		go c.sendDebugInfo(message, response.Metadata, len(conversation.messages))
+		go c.sendDebugInfo(ctx, message, response.Metadata, len(conversation.messages))
 	}
 
 	return nil
@@ -223,7 +223,8 @@ func (c *Chat) getConversationForMessage(message *domain.Message) (*Conversation
 	return conversation, nil
 }
 
-func (c *Chat) sendDebugInfo(message *domain.Message, metadata domain.ResponseMetadata, length int) {
+func (c *Chat) sendDebugInfo(ctx context.Context, message *domain.Message,
+	metadata domain.ResponseMetadata, length int) {
 	debug := fmt.Sprintf(`debug:
 model: %s | retries: %d
 c tokens: %d | total tokens: %d
@@ -235,7 +236,7 @@ convo size: %d | cost: %f`,
 		length,
 		metadata.Cost)
 
-	ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("chat.context_timeout"))
+	ctx, cancel := context.WithTimeout(ctx, viper.GetDuration("chat.context_timeout"))
 	defer cancel()
 
 	_, err := c.textSender.SendMessageReply(ctx,

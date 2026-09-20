@@ -69,7 +69,7 @@ func (m *Magick) Scale(ctx context.Context, imageURL string, power float32) ([]b
 		Msg("scaling image")
 
 	// #nosec G204: only a float as user input
-	cmd := exec.Command(command[0], command[1:]...)
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	err = cmd.Run()
 	if err != nil {
 		return nil, fmt.Errorf("error executing magick command: %w", err)
