@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"hsbot/internal/core/domain"
-	"sync"
 	"testing"
 	"time"
 
@@ -21,7 +20,6 @@ type mockTextSender struct {
 }
 
 func (m *mockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {
-	// not implemented
 }
 
 func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, text string) (int, error) {
@@ -35,25 +33,20 @@ func (m *mockTextSender) NotifyAndReturnError(_ context.Context, err error, _ *d
 }
 
 func TestChatClearContext_Respond_ClearsCacheAndReplies(t *testing.T) {
-	chat := &Chat{cache: new(sync.Map)}
-
-	exitSignal := make(chan struct{}, 1)
-	conversation := &Conversation{
-		messages: []domain.Prompt{
-			{
-				Prompt: "mock message",
-				Author: domain.System,
-			},
-			{
-				Prompt: "mock message 2",
-				Author: domain.User,
-			},
-		},
-		exitSignal: exitSignal,
-	}
+	chat := &Chat{conversations: newConversationStore(time.Minute)}
 
 	chatID := int64(101)
-	chat.cache.Store(chatID, conversation)
+	conversation := chat.conversations.getOrCreate(chatID)
+	conversation.messages = []domain.Prompt{
+		{
+			Prompt: "mock message",
+			Author: domain.System,
+		},
+		{
+			Prompt: "mock message 2",
+			Author: domain.User,
+		},
+	}
 
 	msg := &domain.Message{ID: 1, ChatID: chatID}
 	sender := &mockTextSender{}
@@ -64,21 +57,13 @@ func TestChatClearContext_Respond_ClearsCacheAndReplies(t *testing.T) {
 
 	require.NoError(t, err)
 
-	_, ok := chat.cache.Load(chatID)
+	_, ok := chat.conversations.get(chatID)
 	assert.False(t, ok, "Conversation should be deleted from cache")
 	assert.Equal(t, "cleared conversation context with 2 messages", sender.replyCalls[0])
-
-	// Check exit signal is sent
-	select {
-	case <-exitSignal:
-		// OK: exit signal was sent
-	default:
-		t.Errorf("exitSignal was not sent")
-	}
 }
 
 func TestChatClearContext_Respond_NoConversationInCache(t *testing.T) {
-	chat := &Chat{cache: new(sync.Map)}
+	chat := &Chat{conversations: newConversationStore(time.Minute)}
 
 	chatID := int64(202)
 	msg := &domain.Message{ID: 2, ChatID: chatID}
@@ -93,16 +78,11 @@ func TestChatClearContext_Respond_NoConversationInCache(t *testing.T) {
 }
 
 func TestChatClearContext_Respond_SendReplyFails(t *testing.T) {
-	chat := &Chat{cache: new(sync.Map)}
-
-	exitSignal := make(chan struct{}, 1)
-	conversation := &Conversation{
-		messages:   []domain.Prompt{},
-		exitSignal: exitSignal,
-	}
+	chat := &Chat{conversations: newConversationStore(time.Minute)}
 
 	chatID := int64(303)
-	chat.cache.Store(chatID, conversation)
+	conversation := chat.conversations.getOrCreate(chatID)
+	conversation.messages = []domain.Prompt{}
 
 	msg := &domain.Message{ID: 3, ChatID: chatID}
 	sender := &mockTextSender{
@@ -114,13 +94,12 @@ func TestChatClearContext_Respond_SendReplyFails(t *testing.T) {
 
 	err := cc.Respond(t.Context(), time.Second, msg)
 
-	// Assert
 	require.Error(t, err)
 	assert.Len(t, sender.notifyErrCalls, 1)
 }
 
 func TestChatClearContext_Respond_NoConvoReplyFails(t *testing.T) {
-	chat := &Chat{cache: new(sync.Map)}
+	chat := &Chat{conversations: newConversationStore(time.Minute)}
 
 	msg := &domain.Message{ID: 3, ChatID: 101}
 	sender := &mockTextSender{
@@ -130,10 +109,8 @@ func TestChatClearContext_Respond_NoConvoReplyFails(t *testing.T) {
 
 	cc := NewChatClearContext(chat, sender, "/clear")
 
-	// Act
 	err := cc.Respond(t.Context(), time.Second, msg)
 
-	// Assert
 	require.Error(t, err)
 	assert.Len(t, sender.notifyErrCalls, 1)
 }

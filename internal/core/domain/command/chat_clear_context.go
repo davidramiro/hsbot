@@ -2,13 +2,10 @@ package command
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"hsbot/internal/core/domain"
 	"hsbot/internal/core/port"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type ChatClearContext struct {
@@ -25,16 +22,11 @@ func (c *ChatClearContext) GetCommand() string {
 	return c.command
 }
 
-func (c *ChatClearContext) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
-	l := log.With().
-		Int("messageId", message.ID).
-		Int64("chatId", message.ChatID).
-		Str("command", c.GetCommand()).
-		Logger()
+func (c *ChatClearContext) Respond(ctx context.Context, timeout time.Duration, message *domain.Message) error {
+	ctx, cancel, l := beginRespond(ctx, timeout, message, c.GetCommand())
+	defer cancel()
 
-	l.Info().Msg("handling request")
-
-	conv, ok := c.chat.cache.Load(message.ChatID)
+	conversation, ok := c.chat.Clear(message.ChatID)
 	if !ok {
 		l.Debug().Msg("no conversation in cache")
 
@@ -47,20 +39,12 @@ func (c *ChatClearContext) Respond(ctx context.Context, _ time.Duration, message
 		return nil
 	}
 
-	conversation, ok := conv.(*Conversation)
-	if !ok {
-		return errors.New("conversation type error")
-	}
-
 	size := len(conversation.messages)
 
 	var plural string
 	if size != 1 {
 		plural = "s"
 	}
-
-	c.chat.cache.Delete(message.ChatID)
-	conversation.exitSignal <- struct{}{}
 
 	l.Debug().Msg("cleared conversation cache")
 
