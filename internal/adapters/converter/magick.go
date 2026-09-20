@@ -20,13 +20,13 @@ type Magick struct {
 	magickBinary []string
 }
 
-func NewMagick() (*Magick, error) {
+func NewMagick(ctx context.Context) (*Magick, error) {
 	eh := &Magick{}
 	commands := [][]string{{"magick", "convert", "-version"}, {"convert", "-version"}}
 
 	for _, command := range commands {
 		// #nosec G204: no user input
-		_, err := exec.Command(command[0], command[1:]...).Output()
+		_, err := exec.CommandContext(ctx, command[0], command[1:]...).Output()
 		if err != nil {
 			log.Debug().Strs("command", command).Msg("binary not found")
 			continue
