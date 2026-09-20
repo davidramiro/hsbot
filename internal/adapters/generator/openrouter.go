@@ -304,6 +304,9 @@ func imageFromResponse(resp openrouter.ImageGenerationResponse) (domain.Generate
 	return domain.GeneratedImage{Data: data, Cost: cost}, nil
 }
 
+// TODO: openrouter does not return usage on speech api yet. ballpark...
+const speechCost = 0.001
+
 func (o *OpenRouter) Speak(ctx context.Context, text string) (domain.GeneratedAudio, error) {
 	if len(o.voiceModels) == 0 {
 		return domain.GeneratedAudio{}, errors.New("no voice models configured")
@@ -321,8 +324,7 @@ func (o *OpenRouter) Speak(ctx context.Context, text string) (domain.GeneratedAu
 
 	return domain.GeneratedAudio{
 		Data: result.Audio,
-		// TODO: openrouter does not return usage on speech api yet. ballpark...
-		Cost: 0.001,
+		Cost: speechCost,
 	}, nil
 }
 
