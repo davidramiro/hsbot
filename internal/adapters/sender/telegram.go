@@ -19,6 +19,7 @@ type TelegramBotAPI interface {
 	SendMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error)
 	SendPhoto(ctx context.Context, params *bot.SendPhotoParams) (*models.Message, error)
 	SendChatAction(ctx context.Context, params *bot.SendChatActionParams) (bool, error)
+	SendVoice(ctx context.Context, params *bot.SendVoiceParams) (*models.Message, error)
 }
 
 type Telegram struct {
@@ -99,6 +100,26 @@ func (s *Telegram) SendImageFileReply(ctx context.Context, message *domain.Messa
 	return nil
 }
 
+func (s *Telegram) SendAudioReply(ctx context.Context, message *domain.Message, file []byte) error {
+	params := &bot.SendVoiceParams{
+		ChatID: message.ChatID,
+		Voice:  &models.InputFileUpload{Filename: "voice.mp3", Data: bytes.NewReader(file)},
+		ReplyParameters: &models.ReplyParameters{
+			MessageID: message.ID,
+			ChatID:    message.ChatID,
+		},
+	}
+
+	log.Debug().Int64("chatID", message.ChatID).Int("size", len(file)).Msg("sent voice reply")
+
+	_, err := s.bot.SendVoice(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to send voice: %w", err)
+	}
+
+	return nil
+}
+
 const ChatActionRepeatSeconds = 5
 
 func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action domain.Action) {
@@ -109,6 +130,8 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 		switch action {
 		case domain.SendingPhoto:
 			chatAction = models.ChatActionUploadPhoto
+		case domain.RecordingVoiceAction:
+			chatAction = models.ChatActionRecordVoice
 		case domain.Typing:
 			chatAction = models.ChatActionTyping
 		default:

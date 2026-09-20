@@ -21,3 +21,7 @@ type ImageSender interface {
 	// SendImageFileReply sends an image as a file in response to the provided message within the specified context.
 	SendImageFileReply(ctx context.Context, message *domain.Message, file []byte) error
 }
+
+type AudioSender interface {
+	SendAudioReply(ctx context.Context, message *domain.Message, file []byte) error
+}

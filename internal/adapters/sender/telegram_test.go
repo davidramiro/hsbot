@@ -31,6 +31,11 @@ func (m *MockBot) SendChatAction(ctx context.Context, params *bot.SendChatAction
 	args := m.Called(ctx, params)
 	return args.Bool(0), args.Error(1)
 }
+func (m *MockBot) SendVoice(ctx context.Context, params *bot.SendVoiceParams) (*models.Message, error) {
+	args := m.Called(ctx, params)
+	msg, _ := args.Get(0).(*models.Message)
+	return msg, args.Error(1)
+}
 
 func TestTelegramSender_SendMessageReply(t *testing.T) {
 	b := make([]byte, TelegramMessageLimit+10)
@@ -175,6 +180,47 @@ func TestTelegramSender_SendImageFileReply(t *testing.T) {
 				Return(&models.Message{}, tc.retErr).Once()
 
 			err := sender.SendImageFileReply(t.Context(), msg, tc.file)
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			mb.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTelegramSender_SendAudioReply(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    []byte
+		retErr  error
+		wantErr bool
+	}{
+		{
+			name:    "success",
+			file:    []byte("mp3data"),
+			retErr:  nil,
+			wantErr: false,
+		},
+		{
+			name:    "fail send",
+			file:    []byte("fake"),
+			retErr:  errors.New("fail"),
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mb := new(MockBot)
+			sender := NewTelegram(mb)
+
+			msg := &domain.Message{ID: 33, ChatID: 44}
+			mb.On("SendVoice", mock.Anything, mock.Anything).
+				Return(&models.Message{}, tc.retErr).Once()
+
+			err := sender.SendAudioReply(t.Context(), msg, tc.file)
 
 			if tc.wantErr {
 				require.Error(t, err)
