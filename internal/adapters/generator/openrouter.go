@@ -20,13 +20,15 @@ import (
 
 // OpenRouter wraps the OpenRouter API.
 type OpenRouter struct {
-	client            OpenRouterClient
-	TextModels        []domain.Model
-	defaultTextModels []domain.Model
-	voiceModels       []domain.Model
-	ttsModel          string
-	sttModel          string
-	systemPrompt      string
+	client             OpenRouterClient
+	TextModels         []domain.Model
+	defaultTextModels  []domain.Model
+	imageModels        []domain.Model
+	defaultImageModels []domain.Model
+	voiceModels        []domain.Model
+	ttsModel           string
+	sttModel           string
+	systemPrompt       string
 }
 
 // OpenRouterClient wraps all used methods from *openrouter.Client. Used for mocking in tests.
@@ -36,6 +38,8 @@ type OpenRouterClient interface {
 	CreateSpeech(ctx context.Context, request openrouter.SpeechRequest) (openrouter.SpeechResponse, error)
 	CreateTranscription(ctx context.Context,
 		request openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error)
+	CreateImages(ctx context.Context,
+		request openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error)
 }
 
 func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
@@ -47,22 +51,10 @@ func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
 		),
 	}
 
-	var models []domain.Model
-	err := viper.UnmarshalKey("openrouter.models", &models)
+	models, defaultModels, err := unmarshalModels("openrouter.models")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to unmarshal openrouter models from config")
 		return nil, err
-	}
-
-	sort.Slice(models, func(i, j int) bool {
-		return models[i].Default < models[j].Default
-	})
-
-	var defaultModels []domain.Model
-	for _, model := range models {
-		if model.Default != 0 {
-			defaultModels = append(defaultModels, model)
-		}
 	}
 
 	if len(defaultModels) == 0 {
@@ -71,6 +63,19 @@ func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
 
 	or.TextModels = models
 	or.defaultTextModels = defaultModels
+
+	imageModels, defaultImageModels, err := unmarshalModels("openrouter.image_models")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to unmarshal openrouter image models from config")
+		return nil, err
+	}
+
+	if len(defaultImageModels) == 0 {
+		return nil, errors.New("no default image model found")
+	}
+
+	or.imageModels = imageModels
+	or.defaultImageModels = defaultImageModels
 
 	or.ttsModel = viper.GetString("openrouter.tts_model")
 	or.sttModel = viper.GetString("openrouter.stt_model")
@@ -89,6 +94,26 @@ func NewOpenRouter(apiKey, systemPrompt string) (*OpenRouter, error) {
 	}
 
 	return or, nil
+}
+
+func unmarshalModels(key string) ([]domain.Model, []domain.Model, error) {
+	var models []domain.Model
+	if err := viper.UnmarshalKey(key, &models); err != nil {
+		return nil, nil, err
+	}
+
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].Default < models[j].Default
+	})
+
+	var defaults []domain.Model
+	for _, model := range models {
+		if model.Default != 0 {
+			defaults = append(defaults, model)
+		}
+	}
+
+	return models, defaults, nil
 }
 
 func (o *OpenRouter) GenerateFromPrompt(
@@ -236,6 +261,85 @@ func (o *OpenRouter) findModelByMessage(message *string) domain.Model {
 	}
 
 	return domain.Model{}
+}
+
+func (o *OpenRouter) findImageModel(message *string) domain.Model {
+	for _, model := range o.imageModels {
+		lowercaseMessage := strings.ToLower(*message)
+		lowerCaseModel := strings.ToLower("#" + model.Keyword)
+		if strings.Contains(lowercaseMessage, lowerCaseModel) {
+			i := strings.Index(lowercaseMessage, lowerCaseModel)
+			*message = (*message)[:i] + (*message)[i+len(lowerCaseModel):]
+			return model
+		}
+	}
+
+	if len(o.defaultImageModels) > 0 {
+		return o.defaultImageModels[0]
+	}
+
+	return domain.Model{}
+}
+
+func (o *OpenRouter) GenerateImage(ctx context.Context, prompt string) (domain.GeneratedImage, error) {
+	return o.createImage(ctx, prompt, "")
+}
+
+func (o *OpenRouter) EditImage(ctx context.Context, prompt domain.Prompt) (domain.GeneratedImage, error) {
+	if prompt.Prompt == "" {
+		return domain.GeneratedImage{}, errors.New("missing prompt")
+	}
+
+	if prompt.ImageURL == "" {
+		return domain.GeneratedImage{}, errors.New("missing image")
+	}
+
+	return o.createImage(ctx, prompt.Prompt, prompt.ImageURL)
+}
+
+func (o *OpenRouter) createImage(ctx context.Context, prompt, imageURL string) (domain.GeneratedImage, error) {
+	model := o.findImageModel(&prompt)
+	if model.Identifier == "" {
+		return domain.GeneratedImage{}, errors.New("no image model configured")
+	}
+
+	req := openrouter.ImageGenerationRequest{
+		Model:        model.Identifier,
+		Prompt:       prompt,
+		OutputFormat: openrouter.ImageOutputFormatPng,
+	}
+
+	if imageURL != "" {
+		req.InputReferences = []openrouter.ImageInputReference{{
+			Type:     openrouter.ImageInputReferenceTypeImageURL,
+			ImageURL: openrouter.ImageURLRef{URL: imageURL},
+		}}
+	}
+
+	resp, err := o.client.CreateImages(ctx, req)
+	if err != nil {
+		return domain.GeneratedImage{}, fmt.Errorf("openrouter image API error: %w", err)
+	}
+
+	return imageFromResponse(resp)
+}
+
+func imageFromResponse(resp openrouter.ImageGenerationResponse) (domain.GeneratedImage, error) {
+	if len(resp.Data) == 0 || resp.Data[0].B64JSON == "" {
+		return domain.GeneratedImage{}, errors.New("no images returned from openrouter")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(resp.Data[0].B64JSON)
+	if err != nil {
+		return domain.GeneratedImage{}, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	var cost float64
+	if resp.Usage != nil && resp.Usage.Cost != nil {
+		cost = *resp.Usage.Cost
+	}
+
+	return domain.GeneratedImage{Data: data, Cost: cost}, nil
 }
 
 func (o *OpenRouter) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {

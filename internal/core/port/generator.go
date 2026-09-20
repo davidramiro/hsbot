@@ -18,11 +18,8 @@ type Transcriber interface {
 }
 
 type ImageGenerator interface {
-	// GenerateFromPrompt generates an image based on the provided textual prompt within the given context.
-	GenerateFromPrompt(ctx context.Context, prompt string) (string, error)
-	// EditFromPrompt edits an existing image based on the supplied prompt details within the provided execution
-	// context.
-	EditFromPrompt(ctx context.Context, prompt domain.Prompt) (string, error)
+	GenerateImage(ctx context.Context, prompt string) (domain.GeneratedImage, error)
+	EditImage(ctx context.Context, prompt domain.Prompt) (domain.GeneratedImage, error)
 }
 
 type AudioGenerator interface {

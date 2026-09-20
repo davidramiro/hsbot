@@ -68,11 +68,6 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
 
-	fal := generator.NewFAL(
-		viper.GetString("fal.image_gen_url"),
-		viper.GetString("fal.image_edit_url"),
-		viper.GetString("fal.api_key"))
-
 	or, err := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
 		viper.GetString("chat.system_prompt"))
 	if err != nil {
@@ -102,8 +97,8 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	registry.Register(chat)
 	registry.RegisterAlias("/speak", chat)
 	registry.Register(command.NewModels(or, t, "/models"))
-	registry.Register(command.NewImage(fal, t, t, track, "/image"))
-	registry.Register(command.NewEdit(fal, t, t, track, "/edit"))
+	registry.Register(command.NewImage(or, t, t, track, "/image"))
+	registry.Register(command.NewEdit(or, t, t, track, "/edit"))
 	registry.Register(command.NewScale(magick, t, t, "/scale"))
 	registry.Register(command.NewTranscribe(or, t, "/transcribe"))
 	registry.Register(command.NewChatClearContext(chat, t, "/clear"))

@@ -11,7 +11,7 @@ import (
 )
 
 func TestEditHandler_Success(t *testing.T) {
-	mg := &MockImageGenerator{imageURL: "http://image.url"}
+	mg := &MockImageGenerator{data: []byte("png")}
 	ms := &MockImageSender{}
 	mt := &MockTextSender{}
 	mtr := &MockTracker{withinLimit: true}
@@ -28,7 +28,7 @@ func TestEditHandler_Success(t *testing.T) {
 	err := eh.Respond(t.Context(), time.Second, msg)
 	require.NoError(t, err)
 	assert.True(t, ms.called, "image sender should be called")
-	assert.Equal(t, "http://image.url", ms.calledURL)
+	assert.Equal(t, []byte("png"), ms.calledFile)
 	assert.Empty(t, mt.Message)
 }
 
@@ -94,7 +94,7 @@ func TestEditHandler_EditFromPromptError(t *testing.T) {
 }
 
 func TestEditHandler_SendImageURLReplyError(t *testing.T) {
-	mg := &MockImageGenerator{imageURL: "http://image.url"}
+	mg := &MockImageGenerator{data: []byte("png")}
 	ms := &MockImageSender{err: errors.New("send-failed")}
 	mt := &MockTextSender{}
 	mtr := &MockTracker{withinLimit: true}

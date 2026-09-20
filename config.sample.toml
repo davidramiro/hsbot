@@ -47,12 +47,7 @@ stt_model = "openai/whisper-large-v3-turbo"
 voices = [
     { keyword = "default", identifier = "b347db033a6549378b48d00acb0d06cd", Default = 1},
 ]
-
-[fal]
-api_key = "4242:1234"
-image_gen_url = "https://fal.run/fal-ai/imagen3/fast"
-# cost per generated image
-image_gen_cost = 0.025
-image_edit_url = "https://fal.run/fal-ai/bagel/edit"
-# cost per edited image
-image_edit_cost = 0.10
+image_models = [
+    { keyword = "flash", identifier = "google/gemini-2.5-flash-image", Default = 1},
+    { keyword = "gpt", identifier = "openai/gpt-image-1"},
+]

@@ -12,25 +12,25 @@ import (
 )
 
 type MockImageGenerator struct {
-	response string
-	imageURL string
-	err      error
-	Message  string
+	data    []byte
+	err     error
+	Message string
 }
 
-func (m *MockImageGenerator) GenerateFromPrompt(_ context.Context, prompt string) (string, error) {
+func (m *MockImageGenerator) GenerateImage(_ context.Context, prompt string) (domain.GeneratedImage, error) {
 	m.Message = prompt
-	return m.response, m.err
+	return domain.GeneratedImage{Data: m.data, Cost: 0.01}, m.err
 }
 
-func (m *MockImageGenerator) EditFromPrompt(_ context.Context, _ domain.Prompt) (string, error) {
-	return m.imageURL, m.err
+func (m *MockImageGenerator) EditImage(_ context.Context, _ domain.Prompt) (domain.GeneratedImage, error) {
+	return domain.GeneratedImage{Data: m.data, Cost: 0.01}, m.err
 }
 
 type MockImageSender struct {
-	calledURL string
-	called    bool
-	err       error
+	calledFile []byte
+	calledURL  string
+	called     bool
+	err        error
 }
 
 func (m *MockImageSender) SendImageURLReply(_ context.Context, _ *domain.Message, imageURL string) error {
@@ -40,7 +40,9 @@ func (m *MockImageSender) SendImageURLReply(_ context.Context, _ *domain.Message
 }
 
 func (m *MockImageSender) SendImageFileReply(_ context.Context, _ *domain.Message, file []byte) error {
+	m.calledFile = file
 	m.calledURL = string(file)
+	m.called = true
 	return m.err
 }
 
@@ -57,7 +59,7 @@ func TestNewImageHandler(t *testing.T) {
 }
 
 func TestImageRepondSuccessful(t *testing.T) {
-	mg := &MockImageGenerator{response: "https://example.org/image.png"}
+	mg := &MockImageGenerator{data: []byte("png")}
 	ms := &MockImageSender{}
 	ts := &MockTextSender{}
 	mtr := &MockTracker{withinLimit: true}
@@ -68,11 +70,11 @@ func TestImageRepondSuccessful(t *testing.T) {
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
 	require.NoError(t, err)
 
-	assert.Equal(t, "https://example.org/image.png", ms.calledURL)
+	assert.Equal(t, []byte("png"), ms.calledFile)
 }
 
 func TestImageRepondSendFailed(t *testing.T) {
-	mg := &MockImageGenerator{response: "https://example.org/image.png"}
+	mg := &MockImageGenerator{data: []byte("png")}
 	mi := &MockImageSender{err: errors.New("mock error")}
 	mt := &MockTextSender{}
 	mtr := &MockTracker{withinLimit: true}
@@ -81,7 +83,7 @@ func TestImageRepondSendFailed(t *testing.T) {
 
 	_ = imageHandler.Respond(t.Context(), time.Minute,
 		&domain.Message{ChatID: 1, ID: 1, Text: "/image prompt"})
-	require.Equal(t, "error sending edited image: mock error", mt.Message)
+	require.Equal(t, "error sending image: mock error", mt.Message)
 }
 
 func TestImageRepondErrorEmptyPrompt(t *testing.T) {

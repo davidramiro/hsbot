@@ -9,8 +9,6 @@ import (
 	"hsbot/internal/core/service"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,7 +17,6 @@ type Image struct {
 	imageSender    port.ImageSender
 	textSender     port.TextSender
 	track          service.Tracker
-	cost           float64
 	command        string
 }
 
@@ -31,7 +28,6 @@ func NewImage(imageGenerator port.ImageGenerator,
 	return &Image{imageGenerator: imageGenerator,
 		imageSender: imageSender,
 		textSender:  textSender,
-		cost:        viper.GetFloat64("fal.image_gen_cost"),
 		track:       track,
 		command:     command}
 }
@@ -66,17 +62,17 @@ func (i *Image) Respond(ctx context.Context, timeout time.Duration, message *dom
 		return nil
 	}
 
-	imageURL, err := i.imageGenerator.GenerateFromPrompt(ctx, prompt)
+	image, err := i.imageGenerator.GenerateImage(ctx, prompt)
 	if err != nil {
 		err = fmt.Errorf("error generating image: %w", err)
 		return i.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
-	i.track.AddCost(message.ChatID, i.cost)
+	i.track.AddCost(message.ChatID, image.Cost)
 
-	err = i.imageSender.SendImageURLReply(ctx, message, imageURL)
+	err = i.imageSender.SendImageFileReply(ctx, message, image.Data)
 	if err != nil {
-		err = fmt.Errorf("error sending edited image: %w", err)
+		err = fmt.Errorf("error sending image: %w", err)
 		return i.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 

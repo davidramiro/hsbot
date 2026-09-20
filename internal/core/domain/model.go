@@ -39,6 +39,11 @@ type ModelResponse struct {
 	Metadata ResponseMetadata
 }
 
+type GeneratedImage struct {
+	Data []byte
+	Cost float64
+}
+
 type Model struct {
 	Keyword    string `json:"keyword"`
 	Identifier string `json:"identifier"`

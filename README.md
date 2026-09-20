@@ -6,7 +6,6 @@ A telegram bot for generating LLM responses, manipulating images and transcribin
 
 - [Telegram bot](https://core.telegram.org/bots) API token
 - [OpenRouter](https://openrouter.ai/) API key
-- [fal.ai](https://fal.ai/docs) API key
 - [ImageMagick](https://imagemagick.org/index.php) binary installed
 
 Copy `config.sample.toml` to `config.toml` and set your keys/options.
@@ -18,7 +17,7 @@ chat responses. Use `#keyword` in a message to target a specific model. Also wor
 when using a model that supports vision.
 - `/speak`: Same as `/chat`, but replies with voice.
 - `/models`: Show a list of currently active models for `/chat`.
-- `/image`: Generating images from a prompt, set to use Flux as default.
+- `/image`: Generate images from a prompt via OpenRouter. Use `#keyword` to pick a model.
 - `/edit`: Edit images via prompt
 - `/scale`: Liquid rescale images with a power factor
 - `/transcribe`: Transcribe audio files and voice messages

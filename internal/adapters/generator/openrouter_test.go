@@ -22,6 +22,8 @@ type mockClient struct {
 		request openrouter.SpeechRequest) (openrouter.SpeechResponse, error)
 	createTranscriptionFunc func(ctx context.Context,
 		request openrouter.TranscriptionRequest) (openrouter.TranscriptionResponse, error)
+	createImagesFunc func(ctx context.Context,
+		request openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error)
 }
 
 func (m *mockClient) CreateChatCompletion(ctx context.Context,
@@ -43,6 +45,14 @@ func (m *mockClient) CreateTranscription(ctx context.Context,
 		return openrouter.TranscriptionResponse{}, nil
 	}
 	return m.createTranscriptionFunc(ctx, request)
+}
+
+func (m *mockClient) CreateImages(ctx context.Context,
+	request openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error) {
+	if m.createImagesFunc == nil {
+		return openrouter.ImageGenerationResponse{}, nil
+	}
+	return m.createImagesFunc(ctx, request)
 }
 
 func TestNewOpenRouter(t *testing.T) {
@@ -68,6 +78,9 @@ func TestNewOpenRouter(t *testing.T) {
 	})
 	viper.Set("openrouter.tts_model", "tts-model")
 	viper.Set("openrouter.stt_model", "stt-model")
+	viper.Set("openrouter.image_models", []domain.Model{
+		{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+	})
 
 	apiKey := "fakeApiKey"
 	systemPrompt := "system test"
@@ -414,4 +427,112 @@ func TestOpenRouter_GenerateSpeech(t *testing.T) {
 			assert.Equal(t, tt.audio, got)
 		})
 	}
+}
+
+func TestOpenRouter_GenerateImage(t *testing.T) {
+	cost := 0.011
+	mock := &mockClient{
+		createImagesFunc: func(_ context.Context, req openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error) {
+			assert.Equal(t, "google/gemini-2.5-flash-image", req.Model)
+			assert.Equal(t, "a cat", req.Prompt)
+			assert.Empty(t, req.InputReferences)
+			return openrouter.ImageGenerationResponse{
+				Data:  []openrouter.ImageGenerationData{{B64JSON: "aW1hZ2U="}},
+				Usage: &openrouter.ImageGenerationUsage{Cost: &cost},
+			}, nil
+		},
+	}
+
+	gen := &OpenRouter{
+		client: mock,
+		defaultImageModels: []domain.Model{
+			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+		},
+	}
+
+	got, err := gen.GenerateImage(t.Context(), "a cat")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("image"), got.Data)
+	assert.InDelta(t, 0.011, got.Cost, 1e-9)
+}
+
+func TestOpenRouter_GenerateImageKeyword(t *testing.T) {
+	mock := &mockClient{
+		createImagesFunc: func(_ context.Context, req openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error) {
+			assert.Equal(t, "openai/gpt-image-1", req.Model)
+			assert.Equal(t, " a cat", req.Prompt)
+			return openrouter.ImageGenerationResponse{
+				Data: []openrouter.ImageGenerationData{{B64JSON: "aW1hZ2U="}},
+			}, nil
+		},
+	}
+
+	gen := &OpenRouter{
+		client: mock,
+		imageModels: []domain.Model{
+			{Keyword: "gpt", Identifier: "openai/gpt-image-1"},
+		},
+		defaultImageModels: []domain.Model{
+			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+		},
+	}
+
+	got, err := gen.GenerateImage(t.Context(), "#gpt a cat")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("image"), got.Data)
+}
+
+func TestOpenRouter_EditImage(t *testing.T) {
+	mock := &mockClient{
+		createImagesFunc: func(_ context.Context, req openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error) {
+			assert.Equal(t, "google/gemini-2.5-flash-image", req.Model)
+			assert.Equal(t, "make it night", req.Prompt)
+			require.Len(t, req.InputReferences, 1)
+			assert.Equal(t, "https://img.example/cat.png", req.InputReferences[0].ImageURL.URL)
+			return openrouter.ImageGenerationResponse{
+				Data: []openrouter.ImageGenerationData{{B64JSON: "aW1hZ2U="}},
+			}, nil
+		},
+	}
+
+	gen := &OpenRouter{
+		client: mock,
+		defaultImageModels: []domain.Model{
+			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+		},
+	}
+
+	got, err := gen.EditImage(t.Context(), domain.Prompt{
+		Prompt:   "make it night",
+		ImageURL: "https://img.example/cat.png",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("image"), got.Data)
+}
+
+func TestOpenRouter_EditImageMissing(t *testing.T) {
+	gen := &OpenRouter{}
+
+	_, err := gen.EditImage(t.Context(), domain.Prompt{ImageURL: "https://img.example/cat.png"})
+	require.Error(t, err)
+
+	_, err = gen.EditImage(t.Context(), domain.Prompt{Prompt: "edit"})
+	require.Error(t, err)
+}
+
+func TestOpenRouter_GenerateImageAPIError(t *testing.T) {
+	mock := &mockClient{
+		createImagesFunc: func(_ context.Context, _ openrouter.ImageGenerationRequest) (openrouter.ImageGenerationResponse, error) {
+			return openrouter.ImageGenerationResponse{}, errors.New("boom")
+		},
+	}
+	gen := &OpenRouter{
+		client: mock,
+		defaultImageModels: []domain.Model{
+			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
+		},
+	}
+
+	_, err := gen.GenerateImage(t.Context(), "a cat")
+	require.Error(t, err)
 }
