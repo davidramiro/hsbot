@@ -6,11 +6,11 @@ import (
 	"hsbot/internal/adapters/generator"
 	"hsbot/internal/adapters/handler"
 	"hsbot/internal/adapters/sender"
+	"hsbot/internal/config"
 	"hsbot/internal/core/domain/command"
 	"hsbot/internal/core/service"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/go-telegram/bot/models"
 
@@ -18,42 +18,33 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
 
 func main() {
 	log.Info().Msg("starting hsbot...")
 
-	err := initConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read config file")
 	}
 
-	initLogger()
+	initLogger(cfg.LogLevel)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	b, err := initBot()
+	b, err := initBot(cfg.Telegram)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing telegram bot")
 	}
 
 	t := sender.NewTelegram(b)
 
-	registry := initHandlers(ctx, t)
+	registry := initHandlers(ctx, t, cfg)
 
-	handlerTimeout, err := time.ParseDuration(viper.GetString("handler.timeout"))
-	if err != nil {
-		log.Panic().Err(err).Msg("invalid timeout for handler in config")
-	}
+	auth := service.NewAuthorizer(t, cfg.Telegram.AllowedChatIDs, cfg.Telegram.AdminUsername)
 
-	auth, err := service.NewAuthorizer(t)
-	if err != nil {
-		log.Panic().Err(err).Msg("failed initializing authorizer")
-	}
-
-	commandHandler := handler.NewCommand(registry, handlerTimeout, auth)
+	commandHandler := handler.NewCommand(registry, cfg.HandlerTimeout, auth)
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/", bot.MatchTypePrefix, commandHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypePhotoCaption, "/", bot.MatchTypePrefix, commandHandler.Handle)
@@ -62,21 +53,28 @@ func main() {
 	b.Start(ctx)
 }
 
-func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
+func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *command.Registry {
 	magick, err := converter.NewMagick(ctx)
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing magick converter")
 	}
 
-	or, err := generator.NewOpenRouter(viper.GetString("openrouter.api_key"),
-		viper.GetString("chat.system_prompt"))
+	or, err := generator.NewOpenRouter(generator.Config{
+		APIKey:       cfg.OpenRouter.APIKey,
+		SystemPrompt: cfg.Chat.SystemPrompt,
+		TextModels:   cfg.OpenRouter.Models,
+		ImageModels:  cfg.OpenRouter.ImageModels,
+		Voices:       cfg.OpenRouter.Voices,
+		TTSModel:     cfg.OpenRouter.TTSModel,
+		STTModel:     cfg.OpenRouter.STTModel,
+	})
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing openrouter generator")
 	}
 
-	registry := &command.Registry{}
+	registry := command.NewRegistry()
 
-	track := service.NewUsageTracker(ctx, t)
+	track := service.NewUsageTracker(ctx, t, cfg.Telegram.DailySpendLimit)
 
 	chat, err := command.NewChat(command.ChatParams{
 		TextGenerator:  or,
@@ -86,8 +84,9 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 		AudioSender:    t,
 		Command:        "/chat",
 		SpeakCommand:   "/speak",
-		CacheDuration:  viper.GetDuration("chat.context_timeout"),
-		Track:          track,
+		CacheDuration:  cfg.Chat.ContextTimeout,
+		DebugReplies:   cfg.DebugReplies,
+		Tracker:        track,
 	})
 
 	if err != nil {
@@ -107,22 +106,19 @@ func initHandlers(ctx context.Context, t *sender.Telegram) *command.Registry {
 	return registry
 }
 
-func initBot() (*bot.Bot, error) {
-	token := viper.GetString("telegram.bot_token")
-	apiURL := viper.GetString("telegram.api_url")
-
+func initBot(cfg config.Telegram) (*bot.Bot, error) {
 	opts := []bot.Option{
 		bot.WithDefaultHandler(noOpHandler),
-		bot.WithServerURL(apiURL),
+		bot.WithServerURL(cfg.APIURL),
 	}
 
-	return bot.New(token, opts...)
+	return bot.New(cfg.BotToken, opts...)
 }
 
-func initLogger() {
+func initLogger(level string) {
 	var logLevel zerolog.Level
 
-	switch viper.GetString("bot.log_level") {
+	switch level {
 	case "trace":
 		logLevel = zerolog.TraceLevel
 	case "debug":
@@ -132,14 +128,6 @@ func initLogger() {
 	}
 
 	zerolog.SetGlobalLevel(logLevel)
-}
-
-func initConfig() error {
-	viper.AddConfigPath(".")
-	viper.SetConfigType("toml")
-
-	log.Info().Msg("reading config file...")
-	return viper.ReadInConfig()
 }
 
 func noOpHandler(_ context.Context, _ *bot.Bot, _ *models.Update) {}
