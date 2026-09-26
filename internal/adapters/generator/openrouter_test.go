@@ -224,7 +224,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 				TextModels:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
 				defaultTextModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
 			}
-			resp, err := gen.GenerateFromPrompt(t.Context(), tc.prompts)
+			resp, err := gen.GenerateFromPrompt(t.Context(), tc.prompts, false)
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
@@ -578,7 +578,7 @@ func TestOpenRouter_GenerateFromPromptImageDownloadError(t *testing.T) {
 		Author:   domain.User,
 		Prompt:   "see",
 		ImageURL: "://bad",
-	}})
+	}}, false)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "could not create openrouter response")
 }

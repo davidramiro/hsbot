@@ -15,6 +15,30 @@ If there is no @, it's just the first name of the user. You can directly address
 You support multiple models, for a list of available models, the user can type '/models'.
 A user can interact with any model by using a '#' followed by the keyword, for example '/chat #gpt prompt goes here'.
 '''
+voice_prompt_addition = '''
+Important:  For the next message, you are generating audio. Discard all emojis.
+Call the usernames without '@'. Use proper punctuation
+to make speech natural.
+
+Add emotional or stylistic cues in square brackets within your text:
+
+"[happy] What a beautiful day!"
+"[sad] I'm sorry to hear that."
+"[excited] This is amazing news!"
+
+The output will interpret these markers and adjust the voice accordingly.
+Control volume, intensity, and emphasis. Place [emphasis] right before the word or phrase you want to stress:
+
+"This is [emphasis] really important."
+
+Add natural human sounds:
+
+Laughing: "[laughing] Ha, ha, ha"
+Sobbing: "[sobbing]"
+Crying Loudly:	"[crying loudly]"
+Sighing: "[sighing] sigh"
+Yawning: "[yawning] yawn"
+'''
 
 [handler]
 # timeout for actions initiated by the command handler

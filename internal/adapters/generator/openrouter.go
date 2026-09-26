@@ -18,15 +18,16 @@ import (
 
 // OpenRouter wraps the OpenRouter API.
 type OpenRouter struct {
-	client             OpenRouterClient
-	TextModels         []domain.Model
-	defaultTextModels  []domain.Model
-	imageModels        []domain.Model
-	defaultImageModels []domain.Model
-	voiceModels        []domain.Model
-	ttsModel           string
-	sttModel           string
-	systemPrompt       string
+	client              OpenRouterClient
+	TextModels          []domain.Model
+	defaultTextModels   []domain.Model
+	imageModels         []domain.Model
+	defaultImageModels  []domain.Model
+	voiceModels         []domain.Model
+	ttsModel            string
+	sttModel            string
+	systemPrompt        string
+	voicePromptAddition string
 }
 
 // OpenRouterClient wraps all used methods from *openrouter.Client. Used for mocking in tests.
@@ -41,13 +42,14 @@ type OpenRouterClient interface {
 }
 
 type Config struct {
-	APIKey       string
-	SystemPrompt string
-	TextModels   []domain.Model
-	ImageModels  []domain.Model
-	Voices       []domain.Model
-	TTSModel     string
-	STTModel     string
+	APIKey              string
+	SystemPrompt        string
+	VoicePromptAddition string
+	TextModels          []domain.Model
+	ImageModels         []domain.Model
+	Voices              []domain.Model
+	TTSModel            string
+	STTModel            string
 }
 
 func NewOpenRouter(cfg Config) (*OpenRouter, error) {
@@ -66,7 +68,8 @@ func NewOpenRouter(cfg Config) (*OpenRouter, error) {
 	}
 
 	return &OpenRouter{
-		systemPrompt: cfg.SystemPrompt,
+		systemPrompt:        cfg.SystemPrompt,
+		voicePromptAddition: cfg.VoicePromptAddition,
 		client: openrouter.NewClient(
 			cfg.APIKey,
 			openrouter.WithXTitle("hsbot"),
@@ -101,7 +104,7 @@ func (o *OpenRouter) ListTextModels() []domain.Model {
 }
 
 func (o *OpenRouter) GenerateFromPrompt(
-	ctx context.Context, prompts []domain.Prompt) (domain.GeneratedText, error) {
+	ctx context.Context, prompts []domain.Prompt, spoken bool) (domain.GeneratedText, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(prompts)+1)
 
 	messages[0] = openrouter.ChatCompletionMessage{
@@ -130,6 +133,16 @@ func (o *OpenRouter) GenerateFromPrompt(
 	}
 
 	latestPrompt := prompts[len(prompts)-1].Prompt
+
+	if spoken {
+		messages = append(messages, openrouter.ChatCompletionMessage{
+			Role: openrouter.ChatMessageRoleSystem,
+			Content: openrouter.Content{
+				Text: o.voicePromptAddition,
+			},
+		})
+	}
+
 	model := o.findModelByMessage(&latestPrompt)
 	prompts[len(prompts)-1].Prompt = latestPrompt
 

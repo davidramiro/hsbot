@@ -60,13 +60,14 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 	}
 
 	or, err := generator.NewOpenRouter(generator.Config{
-		APIKey:       cfg.OpenRouter.APIKey,
-		SystemPrompt: cfg.Chat.SystemPrompt,
-		TextModels:   cfg.OpenRouter.Models,
-		ImageModels:  cfg.OpenRouter.ImageModels,
-		Voices:       cfg.OpenRouter.Voices,
-		TTSModel:     cfg.OpenRouter.TTSModel,
-		STTModel:     cfg.OpenRouter.STTModel,
+		APIKey:              cfg.OpenRouter.APIKey,
+		VoicePromptAddition: cfg.Chat.VoicePromptAddition,
+		SystemPrompt:        cfg.Chat.SystemPrompt,
+		TextModels:          cfg.OpenRouter.Models,
+		ImageModels:         cfg.OpenRouter.ImageModels,
+		Voices:              cfg.OpenRouter.Voices,
+		TTSModel:            cfg.OpenRouter.TTSModel,
+		STTModel:            cfg.OpenRouter.STTModel,
 	})
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing openrouter generator")

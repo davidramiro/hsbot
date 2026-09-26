@@ -8,7 +8,7 @@ import (
 type TextGenerator interface {
 	// GenerateFromPrompt generates a response based on the provided prompts within the given context. Returns a
 	// domain.GeneratedText or an error.
-	GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt) (domain.GeneratedText, error)
+	GenerateFromPrompt(ctx context.Context, prompts []domain.Prompt, spoken bool) (domain.GeneratedText, error)
 }
 
 type Transcriber interface {

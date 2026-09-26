@@ -129,7 +129,7 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 			ImageURL: message.ImageURL})
 	}
 
-	response, err := c.textGenerator.GenerateFromPrompt(ctx, conversation.messages)
+	response, err := c.textGenerator.GenerateFromPrompt(ctx, conversation.messages, c.shallSpeak(message))
 	if err != nil {
 		err := fmt.Errorf("failed to generate response: %w", err)
 		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})

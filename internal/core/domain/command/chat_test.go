@@ -18,7 +18,7 @@ type MockTextGenerator struct {
 	Message         string
 }
 
-func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt) (domain.GeneratedText, error) {
+func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt, _ bool) (domain.GeneratedText, error) {
 	return domain.GeneratedText{
 		Response: m.response,
 		Metadata: domain.ResponseMetadata{
