@@ -23,6 +23,7 @@ type Chat struct {
 	speakCommand   string
 	conversations  *conversationStore
 	debugReplies   bool
+	spoiler        bool
 
 	tracker port.Tracker
 	l       *zerolog.Logger
@@ -37,6 +38,7 @@ type ChatParams struct {
 	Command        string
 	SpeakCommand   string
 	CacheDuration  time.Duration
+	Spoiler        bool
 	DebugReplies   bool
 	Tracker        port.Tracker
 }
@@ -62,6 +64,7 @@ func NewChat(p ChatParams) (*Chat, error) {
 		conversations:  newConversationStore(p.CacheDuration),
 		debugReplies:   p.DebugReplies,
 		tracker:        p.Tracker,
+		spoiler:        p.Spoiler,
 		l:              &logger,
 	}
 
@@ -158,7 +161,7 @@ func (c *Chat) shallSpeak(message *domain.Message) bool {
 
 func (c *Chat) sendResponse(ctx context.Context, message *domain.Message, text string) error {
 	if !c.shallSpeak(message) {
-		_, err := c.textSender.SendMessageReply(ctx, message, text)
+		_, err := c.textSender.SendMessageReply(ctx, message, text, c.spoiler)
 		return err
 	}
 
@@ -194,7 +197,7 @@ convo size: %d | cost: %f`,
 		length,
 		metadata.Cost)
 
-	_, err := c.textSender.SendMessageReply(ctx, message, debug)
+	_, err := c.textSender.SendMessageReply(ctx, message, debug, false)
 	if err != nil {
 		log.Warn().Int64("chatID", message.ChatID).Err(err).Msg("failed to send debug info")
 	}

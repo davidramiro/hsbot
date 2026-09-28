@@ -39,6 +39,7 @@ Crying Loudly:	"[crying loudly]"
 Sighing: "[sighing] sigh"
 Yawning: "[yawning] yawn"
 '''
+spoiler = false
 
 [handler]
 # timeout for actions initiated by the command handler

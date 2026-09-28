@@ -27,7 +27,7 @@ func (m *mockTextSender) NotifyAndReturnError(_ context.Context, _ error, _ *dom
 	panic("implement me")
 }
 
-func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, text string) (int, error) {
+func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, text string, _ bool) (int, error) {
 	m.callCount++
 	m.sendCalled = true
 	m.sendReplies = append(m.sendReplies, text)

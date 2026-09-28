@@ -47,7 +47,7 @@ func (h *Transcribe) Respond(ctx context.Context, timeout time.Duration, message
 
 	h.tracker.AddCost(message.ChatID, resp.Metadata.Cost)
 
-	_, err = h.textSender.SendMessageReply(ctx, message, resp.Response)
+	_, err = h.textSender.SendMessageReply(ctx, message, resp.Response, false)
 	if err != nil {
 		err = fmt.Errorf("error sending transcript: %w", err)
 		return h.textSender.NotifyAndReturnError(ctx, err, message)

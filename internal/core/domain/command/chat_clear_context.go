@@ -30,7 +30,7 @@ func (c *ChatClearContext) Respond(ctx context.Context, timeout time.Duration, m
 	if !ok {
 		l.Debug().Msg("no conversation in cache")
 
-		_, err := c.textSender.SendMessageReply(ctx, message, "no conversation context")
+		_, err := c.textSender.SendMessageReply(ctx, message, "no conversation context", false)
 		if err != nil {
 			err = fmt.Errorf("error sending cache clearing response: %w", err)
 			return c.textSender.NotifyAndReturnError(ctx, err, message)
@@ -49,7 +49,7 @@ func (c *ChatClearContext) Respond(ctx context.Context, timeout time.Duration, m
 	l.Debug().Msg("cleared conversation cache")
 
 	_, err := c.textSender.SendMessageReply(ctx, message,
-		fmt.Sprintf("cleared conversation context with %d message%s", size, plural))
+		fmt.Sprintf("cleared conversation context with %d message%s", size, plural), false)
 	if err != nil {
 		err = fmt.Errorf("error sending cache clearing response: %w", err)
 		return c.textSender.NotifyAndReturnError(ctx, err, message)

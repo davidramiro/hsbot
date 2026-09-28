@@ -64,7 +64,7 @@ func (d *Debug) Respond(ctx context.Context, timeout time.Duration, message *dom
 			data[0].Value.Uint64()/kb,
 			data[1].Value.Uint64()/kb,
 			runtime.Version(), goos, goarch,
-		))
+		), false)
 	if err != nil {
 		return err
 	}

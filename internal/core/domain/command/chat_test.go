@@ -18,7 +18,8 @@ type MockTextGenerator struct {
 	Message         string
 }
 
-func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt, _ bool) (domain.GeneratedText, error) {
+func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt, _ bool) (
+	domain.GeneratedText, error) {
 	return domain.GeneratedText{
 		Response: m.response,
 		Metadata: domain.ResponseMetadata{
@@ -39,7 +40,7 @@ type MockTextSender struct {
 	Message string
 }
 
-func (m *MockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, message string) (int, error) {
+func (m *MockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, message string, _ bool) (int, error) {
 	m.Message = message
 	return 0, m.err
 }
@@ -740,7 +741,7 @@ type nthErrorSender struct {
 	calls  int
 }
 
-func (s *nthErrorSender) SendMessageReply(_ context.Context, _ *domain.Message, message string) (int, error) {
+func (s *nthErrorSender) SendMessageReply(_ context.Context, _ *domain.Message, message string, _ bool) (int, error) {
 	s.calls++
 	s.Message = message
 	if s.calls == s.failOn {

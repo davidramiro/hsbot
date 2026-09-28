@@ -22,7 +22,7 @@ type mockTextSender struct {
 func (m *mockTextSender) SendChatAction(_ context.Context, _ int64, _ domain.Action) {
 }
 
-func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, text string) (int, error) {
+func (m *mockTextSender) SendMessageReply(_ context.Context, _ *domain.Message, text string, _ bool) (int, error) {
 	m.replyCalls = append(m.replyCalls, text)
 	return 0, m.replyErr
 }

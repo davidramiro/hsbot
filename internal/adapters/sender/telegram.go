@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"hsbot/internal/core/domain"
 	"time"
+	"unicode/utf16"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
 )
 
-const TelegramMessageLimit = 4096
+const TelegramMessageLimit = 4092
 
 // TelegramBotAPI is a wrapper interface for all the used methods of the *bot.Bot struct. Used for mocking in tests.
 type TelegramBotAPI interface {
@@ -33,20 +34,33 @@ func NewTelegram(bot TelegramBotAPI) *Telegram {
 func (s *Telegram) SendMessageReply(
 	ctx context.Context,
 	message *domain.Message,
-	text string) (int, error) {
+	text string, spoiler bool) (int, error) {
 	replies := (len(text) + TelegramMessageLimit - 1) / TelegramMessageLimit
 	lastSentID := -1
 
 	for i := range replies {
 		substr := text[i*TelegramMessageLimit : min(len(text), (i+1)*TelegramMessageLimit)]
-		sent, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+
+		toSend := &bot.SendMessageParams{
 			ChatID: message.ChatID,
 			Text:   substr,
 			ReplyParameters: &models.ReplyParameters{
 				MessageID: message.ID,
 				ChatID:    message.ChatID,
 			},
-		})
+		}
+
+		if spoiler {
+			toSend.Entities = []models.MessageEntity{
+				{
+					Offset: 0,
+					Length: len(utf16.Encode([]rune(substr))),
+					Type:   models.MessageEntityTypeSpoiler,
+				},
+			}
+		}
+
+		sent, err := s.bot.SendMessage(ctx, toSend)
 		if err != nil {
 			return -1, fmt.Errorf("failed to send message: %w", err)
 		}
@@ -161,7 +175,7 @@ func (s *Telegram) SendChatAction(ctx context.Context, chatID int64, action doma
 func (s *Telegram) NotifyAndReturnError(ctx context.Context, err error, message *domain.Message) error {
 	_, err2 := s.SendMessageReply(ctx,
 		message,
-		fmt.Sprintf("error: %s", err))
+		fmt.Sprintf("error: %s", err), false)
 	if err2 != nil {
 		return fmt.Errorf("failed sending error message: %w: %w", err, err2)
 	}

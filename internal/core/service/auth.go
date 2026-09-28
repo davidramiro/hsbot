@@ -33,7 +33,7 @@ func (a *ChatAuthorizer) IsAuthorized(ctx context.Context, chatID int64) bool {
 
 	_, err := a.sender.SendMessageReply(ctx,
 		&domain.Message{ChatID: chatID},
-		fmt.Sprintf(forbidden, a.adminUsername, chatID))
+		fmt.Sprintf(forbidden, a.adminUsername, chatID), false)
 	if err != nil {
 		log.Err(err).Msg("failed to send unauthorized warning")
 	}

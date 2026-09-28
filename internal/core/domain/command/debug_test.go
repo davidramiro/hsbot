@@ -25,7 +25,7 @@ func (m *MockSender) NotifyAndReturnError(_ context.Context, _ error, _ *domain.
 	return nil
 }
 
-func (m *MockSender) SendMessageReply(ctx context.Context, message *domain.Message, text string) (int, error) {
+func (m *MockSender) SendMessageReply(ctx context.Context, message *domain.Message, text string, _ bool) (int, error) {
 	args := m.Called(ctx, message, text)
 	return args.Int(0), args.Error(1)
 }

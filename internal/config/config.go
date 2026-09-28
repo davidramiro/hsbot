@@ -19,6 +19,7 @@ type Config struct {
 
 type Chat struct {
 	ContextTimeout      time.Duration
+	Spoiler             bool
 	SystemPrompt        string
 	VoicePromptAddition string
 }
@@ -81,6 +82,7 @@ func Load() (*Config, error) {
 			ContextTimeout:      viper.GetDuration("chat.context_timeout"),
 			SystemPrompt:        viper.GetString("chat.system_prompt"),
 			VoicePromptAddition: viper.GetString("chat.voice_prompt_addition"),
+			Spoiler:             viper.GetBool("chat.spoiler"),
 		},
 		Telegram: Telegram{
 			BotToken:        viper.GetString("telegram.bot_token"),

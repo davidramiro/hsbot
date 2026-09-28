@@ -46,7 +46,7 @@ func (t *UsageTracker) CheckLimit(ctx context.Context, chatID int64) bool {
 	if spent > t.dailyLimit {
 		_, err := t.sender.SendMessageReply(ctx,
 			&domain.Message{ChatID: chatID},
-			fmt.Sprintf(overLimit, t.dailyLimit, time.Until(getNextResetTime()).Truncate(time.Second)))
+			fmt.Sprintf(overLimit, t.dailyLimit, time.Until(getNextResetTime()).Truncate(time.Second)), false)
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to send daily limit exceeded warning")
 		}

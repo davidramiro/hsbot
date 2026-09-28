@@ -30,7 +30,7 @@ const spentMessage = "Spent today within ChatID %d: $%.2f."
 
 func (s *Spent) Respond(ctx context.Context, _ time.Duration, message *domain.Message) error {
 	_, err := s.sender.SendMessageReply(ctx, message, fmt.Sprintf(spentMessage,
-		message.ChatID, s.tracker.GetSpent(message.ChatID)))
+		message.ChatID, s.tracker.GetSpent(message.ChatID)), false)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}

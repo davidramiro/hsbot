@@ -88,6 +88,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 		CacheDuration:  cfg.Chat.ContextTimeout,
 		DebugReplies:   cfg.DebugReplies,
 		Tracker:        tracker,
+		Spoiler:        cfg.Chat.Spoiler,
 	})
 
 	if err != nil {

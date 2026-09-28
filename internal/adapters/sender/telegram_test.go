@@ -99,7 +99,7 @@ func TestTelegramSender_SendMessageReply(t *testing.T) {
 			}
 
 			tc.setupMock(mb)
-			_, err := sender.SendMessageReply(t.Context(), msg, tc.text)
+			_, err := sender.SendMessageReply(t.Context(), msg, tc.text, false)
 
 			if tc.wantErr {
 				require.Error(t, err)

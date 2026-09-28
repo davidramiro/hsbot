@@ -105,7 +105,12 @@ func (o *OpenRouter) ListTextModels() []domain.Model {
 
 func (o *OpenRouter) GenerateFromPrompt(
 	ctx context.Context, prompts []domain.Prompt, spoken bool) (domain.GeneratedText, error) {
-	messages := make([]openrouter.ChatCompletionMessage, len(prompts)+1)
+	length := len(prompts) + 1
+	if spoken {
+		length++
+	}
+
+	messages := make([]openrouter.ChatCompletionMessage, length)
 
 	messages[0] = openrouter.ChatCompletionMessage{
 		Role: openrouter.ChatMessageRoleSystem,
@@ -113,6 +118,8 @@ func (o *OpenRouter) GenerateFromPrompt(
 			Text: o.systemPrompt,
 		},
 	}
+
+	var latestPromptIndex int
 
 	for i, prompt := range prompts {
 		switch prompt.Author {
@@ -128,23 +135,21 @@ func (o *OpenRouter) GenerateFromPrompt(
 			if err != nil {
 				return domain.GeneratedText{}, fmt.Errorf("could not create openrouter response: %w", err)
 			}
-			messages[i+1] = msg
+			latestPromptIndex = i + 1
+			messages[latestPromptIndex] = msg
 		}
 	}
 
-	latestPrompt := prompts[len(prompts)-1].Prompt
-
 	if spoken {
-		messages = append(messages, openrouter.ChatCompletionMessage{
+		messages[len(messages)-1] = openrouter.ChatCompletionMessage{
 			Role: openrouter.ChatMessageRoleSystem,
 			Content: openrouter.Content{
 				Text: o.voicePromptAddition,
 			},
-		})
+		}
 	}
 
-	model := o.findModelByMessage(&latestPrompt)
-	prompts[len(prompts)-1].Prompt = latestPrompt
+	model := o.findModelByMessage(&messages[latestPromptIndex].Content.Text)
 
 	ccr := openrouter.ChatCompletionRequest{
 		Messages: messages,
