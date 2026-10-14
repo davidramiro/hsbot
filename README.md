@@ -16,6 +16,8 @@ Copy `config.sample.toml` to `config.toml` and set your keys/options.
 chat responses. Use `#keyword` in a message to target a specific model. Also works with replying to images, 
 when using a model that supports vision.
 - `/speak`: Same as `/chat`, but replies with voice.
+- personas: Optional additional chat commands (e.g. `/marge`) with their own system prompt, configured under
+`chat.personas` in the config file.
 - `/models`: Show a list of currently active models for `/chat`.
 - `/image`: Generate images from a prompt via OpenRouter. Use `#keyword` to pick a model.
 - `/edit`: Edit images via prompt

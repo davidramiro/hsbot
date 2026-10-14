@@ -3,8 +3,9 @@ package domain
 type Author string
 
 const (
-	User   Author = "user"
-	System Author = "system"
+	User      Author = "user"
+	Assistant Author = "system"
+	System    Author = "system_prompt"
 )
 
 type Prompt struct {

@@ -22,6 +22,12 @@ type Chat struct {
 	Spoiler             bool
 	SystemPrompt        string
 	VoicePromptAddition string
+	Personas            []Persona
+}
+
+type Persona struct {
+	Command      string `mapstructure:"command"`
+	SystemPrompt string `mapstructure:"system_prompt"`
 }
 
 type Telegram struct {
@@ -74,6 +80,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("openrouter.voices: %w", err)
 	}
 
+	var personas []Persona
+	if err := viper.UnmarshalKey("chat.personas", &personas); err != nil {
+		return nil, fmt.Errorf("chat.personas: %w", err)
+	}
+
 	return &Config{
 		LogLevel:       viper.GetString("bot.log_level"),
 		DebugReplies:   viper.GetBool("bot.debug_replies"),
@@ -83,6 +94,7 @@ func Load() (*Config, error) {
 			SystemPrompt:        viper.GetString("chat.system_prompt"),
 			VoicePromptAddition: viper.GetString("chat.voice_prompt_addition"),
 			Spoiler:             viper.GetBool("chat.spoiler"),
+			Personas:            personas,
 		},
 		Telegram: Telegram{
 			BotToken:        viper.GetString("telegram.bot_token"),

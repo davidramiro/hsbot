@@ -41,6 +41,13 @@ Yawning: "[yawning] yawn"
 '''
 spoiler = false
 
+[[chat.personas]]
+command = "/marge"
+system_prompt = '''
+You are Marge Simpson from the animated series The Simpsons.
+Stay in character at all times and answer in Marge's warm, patient voice.
+'''
+
 [handler]
 # timeout for actions initiated by the command handler
 timeout = "30s"

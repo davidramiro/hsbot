@@ -62,9 +62,8 @@ func TestNewOpenRouter(t *testing.T) {
 	}
 
 	or, err := NewOpenRouter(Config{
-		APIKey:       "fakeApiKey",
-		SystemPrompt: "system test",
-		TextModels:   expectedModels,
+		APIKey:     "fakeApiKey",
+		TextModels: expectedModels,
 		ImageModels: []domain.Model{
 			{Keyword: "flash", Identifier: "google/gemini-2.5-flash-image", Default: 1},
 		},
@@ -79,7 +78,6 @@ func TestNewOpenRouter(t *testing.T) {
 	assert.NotNil(t, or)
 	assert.Len(t, or.TextModels, 2)
 	assert.Equal(t, expectedModels, or.TextModels)
-	assert.Equal(t, "system test", or.systemPrompt)
 }
 
 func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
@@ -135,7 +133,7 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 			prompts: []domain.Prompt{
 				{
 					Prompt: "i'm an assistant.",
-					Author: domain.System,
+					Author: domain.Assistant,
 				},
 				{
 					Prompt: "hi",
@@ -220,11 +218,11 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 			}
 			gen := &OpenRouter{
 				client:            mock,
-				systemPrompt:      tc.systemPrompt,
 				TextModels:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
 				defaultTextModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
 			}
-			resp, err := gen.GenerateFromPrompt(t.Context(), tc.prompts, false)
+			prompts := append([]domain.Prompt{{Author: domain.System, Prompt: tc.systemPrompt}}, tc.prompts...)
+			resp, err := gen.GenerateFromPrompt(t.Context(), prompts, false)
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
@@ -235,12 +233,50 @@ func TestOpenRouterGenerator_GenerateFromPrompt(t *testing.T) {
 	}
 }
 
+func TestOpenRouterGenerator_MessageRoles(t *testing.T) {
+	var got openrouter.ChatCompletionRequest
+
+	mock := &mockClient{
+		createChatCompletionFunc: func(_ context.Context,
+			ccr openrouter.ChatCompletionRequest) (openrouter.ChatCompletionResponse, error) {
+			got = ccr
+			return openrouter.ChatCompletionResponse{
+				Choices: []openrouter.ChatCompletionChoice{{
+					Message: openrouter.ChatCompletionMessage{
+						Content: openrouter.Content{Text: "hello!"},
+					},
+				}},
+				Model: "gpt",
+				Usage: &openrouter.Usage{},
+			}, nil
+		},
+	}
+
+	gen := &OpenRouter{
+		client:            mock,
+		TextModels:        []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+		defaultTextModels: []domain.Model{{Keyword: "gpt", Identifier: "gpt", Default: 1}},
+	}
+
+	_, err := gen.GenerateFromPrompt(t.Context(), []domain.Prompt{
+		{Author: domain.System, Prompt: "you are marge"},
+		{Author: domain.Assistant, Prompt: "earlier reply"},
+		{Author: domain.User, Prompt: "hello"},
+	}, false)
+	require.NoError(t, err)
+
+	require.Len(t, got.Messages, 3)
+	assert.Equal(t, openrouter.ChatMessageRoleSystem, got.Messages[0].Role)
+	assert.Equal(t, "you are marge", got.Messages[0].Content.Text)
+	assert.Equal(t, openrouter.ChatMessageRoleAssistant, got.Messages[1].Role)
+	assert.Equal(t, openrouter.ChatMessageRoleUser, got.Messages[2].Role)
+}
+
 func TestOpenRouter_RetryCompletion(t *testing.T) {
 	defaultModels := []domain.Model{
 		{Identifier: "model1", Default: 1},
 		{Identifier: "model2", Default: 2},
 	}
-	systemPrompt := "system"
 
 	successResp := openrouter.ChatCompletionResponse{
 		Choices: []openrouter.ChatCompletionChoice{{
@@ -303,7 +339,6 @@ func TestOpenRouter_RetryCompletion(t *testing.T) {
 
 			gen := &OpenRouter{
 				client:            mock,
-				systemPrompt:      systemPrompt,
 				TextModels:        defaultModels,
 				defaultTextModels: defaultModels,
 			}

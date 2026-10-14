@@ -26,7 +26,6 @@ type OpenRouter struct {
 	voiceModels         []domain.Model
 	ttsModel            string
 	sttModel            string
-	systemPrompt        string
 	voicePromptAddition string
 }
 
@@ -43,7 +42,6 @@ type OpenRouterClient interface {
 
 type Config struct {
 	APIKey              string
-	SystemPrompt        string
 	VoicePromptAddition string
 	TextModels          []domain.Model
 	ImageModels         []domain.Model
@@ -68,7 +66,6 @@ func NewOpenRouter(cfg Config) (*OpenRouter, error) {
 	}
 
 	return &OpenRouter{
-		systemPrompt:        cfg.SystemPrompt,
 		voicePromptAddition: cfg.VoicePromptAddition,
 		client: openrouter.NewClient(
 			cfg.APIKey,
@@ -105,48 +102,52 @@ func (o *OpenRouter) ListTextModels() []domain.Model {
 
 func (o *OpenRouter) GenerateFromPrompt(
 	ctx context.Context, prompts []domain.Prompt, spoken bool) (domain.GeneratedText, error) {
-	length := len(prompts) + 1
+	length := len(prompts)
 	if spoken {
 		length++
 	}
 
-	messages := make([]openrouter.ChatCompletionMessage, length)
-
-	messages[0] = openrouter.ChatCompletionMessage{
-		Role: openrouter.ChatMessageRoleSystem,
-		Content: openrouter.Content{
-			Text: o.systemPrompt,
-		},
-	}
+	messages := make([]openrouter.ChatCompletionMessage, 0, length)
 
 	var latestPromptIndex int
 
-	for i, prompt := range prompts {
+	for _, prompt := range prompts {
 		switch prompt.Author {
 		case domain.System:
-			messages[i+1] = openrouter.ChatCompletionMessage{
+			messages = append(messages, openrouter.ChatCompletionMessage{
+				Role: openrouter.ChatMessageRoleSystem,
+				Content: openrouter.Content{
+					Text: prompt.Prompt,
+				},
+			})
+		case domain.Assistant:
+			messages = append(messages, openrouter.ChatCompletionMessage{
 				Role: openrouter.ChatMessageRoleAssistant,
 				Content: openrouter.Content{
 					Text: prompt.Prompt,
 				},
-			}
+			})
 		case domain.User:
 			msg, err := createUserMessage(ctx, prompt)
 			if err != nil {
 				return domain.GeneratedText{}, fmt.Errorf("could not create openrouter response: %w", err)
 			}
-			latestPromptIndex = i + 1
-			messages[latestPromptIndex] = msg
+			latestPromptIndex = len(messages)
+			messages = append(messages, msg)
 		}
 	}
 
 	if spoken {
-		messages[len(messages)-1] = openrouter.ChatCompletionMessage{
+		messages = append(messages, openrouter.ChatCompletionMessage{
 			Role: openrouter.ChatMessageRoleSystem,
 			Content: openrouter.Content{
 				Text: o.voicePromptAddition,
 			},
-		}
+		})
+	}
+
+	if len(messages) == 0 {
+		return domain.GeneratedText{}, errors.New("no prompts provided")
 	}
 
 	model := o.findModelByMessage(&messages[latestPromptIndex].Content.Text)

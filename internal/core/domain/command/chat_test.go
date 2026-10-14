@@ -16,10 +16,12 @@ type MockTextGenerator struct {
 	thoughtResponse string
 	err             error
 	Message         string
+	Prompts         []domain.Prompt
 }
 
-func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, _ []domain.Prompt, _ bool) (
+func (m *MockTextGenerator) GenerateFromPrompt(_ context.Context, prompts []domain.Prompt, _ bool) (
 	domain.GeneratedText, error) {
+	m.Prompts = prompts
 	return domain.GeneratedText{
 		Response: m.response,
 		Metadata: domain.ResponseMetadata{
@@ -766,4 +768,25 @@ func TestChatHandlerDebugSendError(t *testing.T) {
 	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/chat prompt"})
 	require.NoError(t, err)
 	assert.Equal(t, 2, ms.calls)
+}
+
+func TestChatHandlerPersonaSystemPrompt(t *testing.T) {
+	mg := &MockTextGenerator{response: "mock response"}
+	chatHandler, err := NewChat(ChatParams{
+		TextGenerator: mg,
+		TextSender:    &MockTextSender{},
+		Transcriber:   &MockTranscriber{},
+		Command:       "/marge",
+		SystemPrompt:  "You are Marge Simpson.",
+		CacheDuration: time.Minute,
+		Tracker:       &MockTracker{withinLimit: true},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/marge", chatHandler.GetCommand())
+
+	err = chatHandler.Respond(t.Context(), time.Minute, &domain.Message{ChatID: 1, ID: 1, Text: "/marge hi"})
+	require.NoError(t, err)
+	require.NotEmpty(t, mg.Prompts)
+	assert.Equal(t, domain.System, mg.Prompts[0].Author)
+	assert.Equal(t, "You are Marge Simpson.", mg.Prompts[0].Prompt)
 }

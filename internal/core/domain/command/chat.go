@@ -21,6 +21,7 @@ type Chat struct {
 	audioSender    port.AudioSender
 	command        string
 	speakCommand   string
+	systemPrompt   string
 	conversations  *conversationStore
 	debugReplies   bool
 	spoiler        bool
@@ -37,6 +38,7 @@ type ChatParams struct {
 	AudioSender    port.AudioSender
 	Command        string
 	SpeakCommand   string
+	SystemPrompt   string
 	CacheDuration  time.Duration
 	Spoiler        bool
 	DebugReplies   bool
@@ -61,6 +63,7 @@ func NewChat(p ChatParams) (*Chat, error) {
 		audioSender:    p.AudioSender,
 		command:        p.Command,
 		speakCommand:   p.SpeakCommand,
+		systemPrompt:   p.SystemPrompt,
 		conversations:  newConversationStore(p.CacheDuration),
 		debugReplies:   p.DebugReplies,
 		tracker:        p.Tracker,
@@ -132,17 +135,23 @@ func (c *Chat) Respond(ctx context.Context, timeout time.Duration, message *doma
 			ImageURL: message.ImageURL})
 	}
 
-	response, err := c.textGenerator.GenerateFromPrompt(ctx, conversation.messages, c.shallSpeak(message))
+	var prompts []domain.Prompt
+	if c.systemPrompt != "" {
+		prompts = append(prompts, domain.Prompt{Author: domain.System, Prompt: c.systemPrompt})
+	}
+	prompts = append(prompts, conversation.messages...)
+
+	response, err := c.textGenerator.GenerateFromPrompt(ctx, prompts, c.shallSpeak(message))
 	if err != nil {
 		err := fmt.Errorf("failed to generate response: %w", err)
-		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.System, Prompt: err.Error()})
+		conversation.messages = append(conversation.messages, domain.Prompt{Author: domain.Assistant, Prompt: err.Error()})
 		return c.textSender.NotifyAndReturnError(ctx, err, message)
 	}
 
 	c.tracker.AddCost(message.ChatID, response.Metadata.Cost)
 
 	conversation.messages = append(conversation.messages,
-		domain.Prompt{Author: domain.System, Prompt: response.Response})
+		domain.Prompt{Author: domain.Assistant, Prompt: response.Response})
 
 	if err := c.sendResponse(ctx, message, response.Response); err != nil {
 		return err

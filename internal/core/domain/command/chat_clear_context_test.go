@@ -40,7 +40,7 @@ func TestChatClearContext_Respond_ClearsCacheAndReplies(t *testing.T) {
 	conversation.messages = []domain.Prompt{
 		{
 			Prompt: "mock message",
-			Author: domain.System,
+			Author: domain.Assistant,
 		},
 		{
 			Prompt: "mock message 2",

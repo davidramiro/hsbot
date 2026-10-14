@@ -19,6 +19,10 @@ debug_replies = true
 context_timeout = "2m"
 system_prompt = "hi"
 
+[[chat.personas]]
+command = "/marge"
+system_prompt = "You are Marge Simpson."
+
 [handler]
 timeout = "10s"
 
@@ -56,6 +60,9 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, 10*time.Second, cfg.HandlerTimeout)
 	assert.Equal(t, 2*time.Minute, cfg.Chat.ContextTimeout)
 	assert.Equal(t, "hi", cfg.Chat.SystemPrompt)
+	require.Len(t, cfg.Chat.Personas, 1)
+	assert.Equal(t, "/marge", cfg.Chat.Personas[0].Command)
+	assert.Equal(t, "You are Marge Simpson.", cfg.Chat.Personas[0].SystemPrompt)
 	assert.Equal(t, "token", cfg.Telegram.BotToken)
 	assert.Equal(t, "admin", cfg.Telegram.AdminUsername)
 	assert.Equal(t, []int64{1, 2}, cfg.Telegram.AllowedChatIDs)

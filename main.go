@@ -62,7 +62,6 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 	or, err := generator.NewOpenRouter(generator.Config{
 		APIKey:              cfg.OpenRouter.APIKey,
 		VoicePromptAddition: cfg.Chat.VoicePromptAddition,
-		SystemPrompt:        cfg.Chat.SystemPrompt,
 		TextModels:          cfg.OpenRouter.Models,
 		ImageModels:         cfg.OpenRouter.ImageModels,
 		Voices:              cfg.OpenRouter.Voices,
@@ -77,7 +76,7 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 
 	tracker := service.NewUsageTracker(ctx, t, cfg.Telegram.DailySpendLimit)
 
-	chat, err := command.NewChat(command.ChatParams{
+	chatParams := command.ChatParams{
 		TextGenerator:  or,
 		TextSender:     t,
 		Transcriber:    or,
@@ -85,11 +84,14 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 		AudioSender:    t,
 		Command:        "/chat",
 		SpeakCommand:   "/speak",
+		SystemPrompt:   cfg.Chat.SystemPrompt,
 		CacheDuration:  cfg.Chat.ContextTimeout,
 		DebugReplies:   cfg.DebugReplies,
 		Tracker:        tracker,
 		Spoiler:        cfg.Chat.Spoiler,
-	})
+	}
+
+	chat, err := command.NewChat(chatParams)
 
 	if err != nil {
 		log.Panic().Err(err).Msg("failed initializing chat handler")
@@ -97,6 +99,23 @@ func initHandlers(ctx context.Context, t *sender.Telegram, cfg *config.Config) *
 
 	registry.Register(chat)
 	registry.RegisterAlias("/speak", chat)
+
+	for _, persona := range cfg.Chat.Personas {
+		personaParams := chatParams
+		personaParams.Command = persona.Command
+		personaParams.SpeakCommand = ""
+		personaParams.SystemPrompt = persona.SystemPrompt
+
+		personaChat, err := command.NewChat(personaParams)
+		if err != nil {
+			log.Panic().Err(err).
+				Str("persona", persona.Command).
+				Msg("failed initializing persona handler")
+		}
+
+		registry.Register(personaChat)
+	}
+
 	registry.Register(command.NewModels(or, t, "/models"))
 	registry.Register(command.NewImage(or, t, t, tracker, "/image"))
 	registry.Register(command.NewEdit(or, t, t, tracker, "/edit"))
