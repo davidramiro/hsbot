@@ -3,7 +3,7 @@ module hsbot
 go 1.25
 
 require (
-	github.com/go-telegram/bot v1.27.0
+	github.com/go-telegram/bot v1.28.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/revrost/go-openrouter v1.8.0
 	github.com/rs/zerolog v1.35.1
